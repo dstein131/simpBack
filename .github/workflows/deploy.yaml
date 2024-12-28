@@ -18,10 +18,6 @@ jobs:
       with:
         node-version: '16'
 
-    - name: Install Dependencies
-      working-directory: ./server
-      run: npm install
-
     - name: Deploy to EC2
       uses: appleboy/ssh-action@v0.1.5
       with:
@@ -30,20 +26,33 @@ jobs:
         key: ${{ secrets.EC2_KEY }}
         port: 22
         script: |
+          # Ensure Node.js is installed
           if ! command -v node &> /dev/null; then
-            curl -fsSL https://rpm.nodesource.com/setup_16.x | sudo bash -
-            sudo yum install -y nodejs
+            curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
+            sudo apt-get install -y nodejs
           fi
+
+          # Ensure PM2 is installed
           if ! command -v pm2 &> /dev/null; then
             sudo npm install -g pm2
           fi
-          mkdir -p /home/ec2-user/simpBack
-          cd /home/ec2-user/simpBack
-          pm2 stop all || echo "No app running"
-          rm -rf *
-          scp -r $GITHUB_WORKSPACE/server/* .
-          npm install
-          pm2 start server.js --name simpBack --watch
 
-    - name: Notify Deployment
-      run: echo "Deployment completed successfully!"
+          # Create directory and navigate
+          sudo mkdir -p /var/www/simpBack
+          sudo chown -R $USER:$USER /var/www/simpBack
+          cd /var/www/simpBack
+
+          # Stop running processes
+          pm2 stop all || echo "No app running"
+
+          # Clean existing files
+          rm -rf *
+
+          # Copy files from GitHub Actions workspace
+          scp -r $GITHUB_WORKSPACE/server/* .
+
+          # Install dependencies
+          npm install
+
+          # Start the application with PM2
+          pm2 start server.js --name simpBack --watch
