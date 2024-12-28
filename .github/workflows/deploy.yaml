@@ -20,23 +20,16 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.EC2_KEY }}
 
-      # Step 3: Rsync Files to EC2
-      - name: Rsync Files to EC2
-        uses: timvisee/action-rsync@v2.0.0
+      # Step 3: Copy files to EC2 using SCP
+      - name: Copy Files to EC2
+        uses: appleboy/scp-action@v0.1.2
         with:
-          # Source directory on the runner
-          source: "./server/"
-          
-          # Destination directory on EC2
-          destination: "/var/www/simpBack/"
-          
-          # Rsync arguments
-          args: "--archive --delete --exclude 'node_modules'"
-          
-          # EC2 connection details
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
           port: 22
+          source: "server/"
+          target: "/var/www/simpBack/"
 
       # Step 4: Execute Deployment Script on EC2
       - name: Execute Deployment Script on EC2
@@ -54,7 +47,7 @@ jobs:
             # Navigate to the application directory
             cd /var/www/simpBack
 
-            # Debugging: List files to verify transfer
+            # List files to verify transfer
             echo "Listing files in /var/www/simpBack:"
             ls -la
 
