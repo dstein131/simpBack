@@ -48,10 +48,10 @@ jobs:
             # Stop running app
             pm2 stop all || echo "No app running"
 
-            # Clean only the application directory
-            find $APP_DIR -mindepth 1 -delete
+            # Clean only the application directory, excluding sensitive paths
+            find $APP_DIR -mindepth 1 -not -path "$APP_DIR/proc/*" -delete
 
-            # Sync application files (avoid /proc or system paths)
+            # Sync application files
             rsync -av --exclude='/proc' $GITHUB_WORKSPACE/server/ $APP_DIR/
 
             # Install dependencies
