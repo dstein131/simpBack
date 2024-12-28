@@ -11,25 +11,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Step 1: Checkout the repository
       - name: Checkout code
         uses: actions/checkout@v3
 
+      # Step 2: Set up Node.js environment
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18.x'
 
+      # Step 3: Install dependencies and build the project
       - name: Install dependencies and build
         run: |
-          cd simpBack/server
+          cd server
           npm install
           npm run build --if-present
 
+      # Step 4: Zip the build artifacts for deployment
       - name: Zip artifact for deployment
         run: |
-          cd simpBack/server
-          zip -r ../../release.zip ./*
+          cd server
+          zip -r ../release.zip ./*
 
+      # Step 5: Deploy the zipped artifact to Azure Web App
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v2
         with:
@@ -38,11 +43,13 @@ jobs:
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: ./release.zip
 
+      # Step 6: Prepare the Worker WebJob package
       - name: Prepare Worker WebJob
         run: |
-          cd simpBack/server
-          zip -r ../../ttsWorker.zip workers/ttsWorker.js package.json node_modules/
+          cd server
+          zip -r ../ttsWorker.zip workers/ttsWorker.js package.json node_modules/
 
+      # Step 7: Deploy the Worker WebJob to Azure
       - name: Deploy Worker as WebJob
         env:
           PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
@@ -53,6 +60,7 @@ jobs:
           KUDU_API_URL="https://simptipserver.scm.azurewebsites.net/api/continuouswebjobs/${WEBJOB_NAME}/upload"
           curl -X POST -u "$USERNAME:$PASSWORD" -F "file=@ttsWorker.zip" "$KUDU_API_URL"
 
+      # Step 8: Clean up the zipped artifacts
       - name: Clean Up
         run: |
           rm release.zip ttsWorker.zip
