@@ -13,14 +13,6 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: List Files for Debugging
-        run: |
-          echo "Current workspace directory:"
-          echo "$GITHUB_WORKSPACE"
-          echo "Contents of the workspace directory:"
-          ls -R "$GITHUB_WORKSPACE"
-        shell: bash
-
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
@@ -34,52 +26,70 @@ jobs:
           key: ${{ secrets.EC2_KEY }}
           port: 22
           script: |
-            export DEBIAN_FRONTEND=noninteractive
+            set -e
 
-            # Ensure Node.js is installed
+            echo "Starting Deployment Script"
+
+            # Ensure Node.js and npm are installed
             if ! command -v node &> /dev/null; then
+              echo "Node.js not found. Installing..."
               curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
               sudo apt-get install -y nodejs
+            else
+              echo "Node.js is already installed."
             fi
 
-            # Ensure PM2 is installed
+            if ! command -v npm &> /dev/null; then
+              echo "npm is not installed. Exiting."
+              exit 1
+            fi
+
+            # Install PM2 globally if not already installed
             if ! command -v pm2 &> /dev/null; then
+              echo "PM2 not found. Installing..."
               sudo npm install -g pm2
+            else
+              echo "PM2 is already installed."
             fi
 
-            # Define application directory
+            # Application directory on the server
             APP_DIR="/var/www/simpBack"
             SERVER_SOURCE_DIR="${GITHUB_WORKSPACE}/server"
 
-            # Debugging: Confirm source directory
-            echo "Source directory content:"
-            ls -l "$SERVER_SOURCE_DIR"
+            echo "Application Directory: $APP_DIR"
+            echo "Server Source Directory: $SERVER_SOURCE_DIR"
 
-            # Create application directory
+            # Create application directory if it doesn't exist
             sudo mkdir -p $APP_DIR
             sudo chown -R $USER:$USER $APP_DIR
 
-            # Sync application files (only server folder)
+            # Sync files to the server directory
+            echo "Syncing files to the application directory..."
             rsync -avz --delete --exclude='node_modules' "$SERVER_SOURCE_DIR/" "$APP_DIR/"
 
-            # Move into application directory
+            # Navigate to the application directory
             cd $APP_DIR
 
-            # Check if package.json exists
-            if [ -f package.json ]; then
-              echo "Installing dependencies..."
-              npm install
-            else
-              echo "Error: package.json not found in $APP_DIR"
+            # Check for package.json
+            if [ ! -f package.json ]; then
+              echo "Error: package.json not found in $APP_DIR. Exiting."
               exit 1
             fi
 
-            # Check if server.js exists
-            if [ -f server.js ]; then
-              echo "Starting the application with PM2..."
-              pm2 start server.js --name simpBack --watch
-              pm2 save
-            else
-              echo "Error: server.js not found in $APP_DIR"
+            # Install dependencies
+            echo "Installing dependencies..."
+            npm install || { echo "npm install failed"; exit 1; }
+
+            # Check for server.js
+            if [ ! -f server.js ]; then
+              echo "Error: server.js not found in $APP_DIR. Exiting."
               exit 1
             fi
+
+            # Restart the application with PM2
+            echo "Starting the application with PM2..."
+            pm2 delete simpBack || true # Ignore errors if the process doesn't exist
+            pm2 start server.js --name simpBack --watch
+            pm2 save
+
+            echo "Deployment Complete"
