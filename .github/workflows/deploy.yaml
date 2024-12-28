@@ -74,16 +74,23 @@ jobs:
             echo "Installing dependencies..."
             npm install || { echo "npm install failed"; exit 1; }
 
-            # Check for server.js
-            if [ ! -f server.js ]; then
-              echo "Error: server.js not found in /var/www/simpBack. Exiting."
-              exit 1
-            fi
+            # Optional: Build your application if needed
+            # echo "Building the application..."
+            # npm run build || { echo "Build failed"; exit 1; }
 
-            # Restart the application with PM2
+            # Restart the application with PM2 using npm scripts
             echo "Starting the application with PM2..."
             pm2 delete simpBack || true # Ignore errors if the process doesn't exist
-            pm2 start server.js --name simpBack --watch
+
+            # Start the main server
+            pm2 start npm --name "simpBack-server" -- start
+
+            # Start the worker
+            pm2 start npm --name "simpBack-worker" -- run worker
+
+            # Optionally, you can start additional workers or other scripts
+            # pm2 start npm --name "simpBack-worker-dev" -- run worker-dev
+
             pm2 save
 
             echo "Deployment Complete"
