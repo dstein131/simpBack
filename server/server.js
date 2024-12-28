@@ -180,6 +180,6 @@ ttsQueue.on('failed', async (job, err) => {
  *  START THE SERVER
  ********************************************/
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`✅ Server is running on http://localhost:${PORT}`);
 });

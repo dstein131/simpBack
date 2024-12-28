@@ -47,7 +47,13 @@ jobs:
       - name: Prepare Worker WebJob
         run: |
           cd server
-          zip -r ../ttsWorker.zip workers/ttsWorker.js package.json node_modules/
+          # Install dependencies for the WebJob in a separate directory
+          mkdir worker_deploy
+          cp workers/ttsWorker.js worker_deploy/
+          cp package.json worker_deploy/
+          cd worker_deploy
+          npm install
+          zip -r ../ttsWorker.zip ./*
 
       # Step 7: Deploy the Worker WebJob to Azure
       - name: Deploy Worker as WebJob
