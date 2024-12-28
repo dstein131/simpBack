@@ -54,7 +54,7 @@ jobs:
 
             # Application directory on the server
             APP_DIR="/var/www/simpBack"
-            SERVER_SOURCE_DIR="${GITHUB_WORKSPACE}/server"
+            SERVER_SOURCE_DIR="$HOME/actions-runner/_work/simpBack/server"
 
             echo "Application Directory: $APP_DIR"
             echo "Server Source Directory: $SERVER_SOURCE_DIR"
