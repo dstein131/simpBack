@@ -30,17 +30,6 @@ jobs:
 
             echo "Starting Deployment Script"
 
-            # Log GITHUB_WORKSPACE for debugging
-            echo "GITHUB_WORKSPACE is set to: $GITHUB_WORKSPACE"
-            ls -la $GITHUB_WORKSPACE
-
-            # Application directory on the server
-            APP_DIR="/var/www/simpBack"
-            SERVER_SOURCE_DIR="$GITHUB_WORKSPACE/server"
-
-            echo "Application Directory: $APP_DIR"
-            echo "Server Source Directory: $SERVER_SOURCE_DIR"
-
             # Ensure Node.js and npm are installed
             if ! command -v node &> /dev/null; then
               echo "Node.js not found. Installing..."
@@ -62,6 +51,13 @@ jobs:
             else
               echo "PM2 is already installed."
             fi
+
+            # Application directory on the server
+            APP_DIR="/var/www/simpBack"
+            SERVER_SOURCE_DIR="${GITHUB_WORKSPACE}/server"
+
+            echo "Application Directory: $APP_DIR"
+            echo "Server Source Directory: $SERVER_SOURCE_DIR"
 
             # Debugging: Verify the SERVER_SOURCE_DIR
             if [ ! -d "$SERVER_SOURCE_DIR" ]; then
