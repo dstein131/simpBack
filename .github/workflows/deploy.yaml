@@ -13,6 +13,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
+      - name: List Files for Debugging
+        run: ls -R
+        shell: bash
+        working-directory: $GITHUB_WORKSPACE
+
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
@@ -42,6 +47,10 @@ jobs:
             # Define application directory
             APP_DIR="/var/www/simpBack"
             SERVER_SOURCE_DIR="$GITHUB_WORKSPACE/server"
+
+            # Debugging: List directory contents
+            echo "Source directory content:"
+            ls -l $SERVER_SOURCE_DIR
 
             # Create application directory
             sudo mkdir -p $APP_DIR
