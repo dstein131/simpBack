@@ -45,7 +45,7 @@ jobs:
           cd server
           zip -r ../release.zip ./* -x "node_modules/*" "logs/*" "*.git*" "*.github*" "README.md"
 
-      # Step 6: Deploy the zipped artifact to Azure Web App with Remote Build
+      # Step 6: Deploy the zipped artifact to Azure Web App
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v2
         with:
