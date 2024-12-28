@@ -19,7 +19,7 @@ jobs:
         node-version: '16'
 
     - name: Install Dependencies
-      working-directory: ./server # Ensure we're working in the server directory
+      working-directory: ./server
       run: npm install
 
     - name: Deploy to EC2
@@ -30,20 +30,19 @@ jobs:
         key: ${{ secrets.EC2_KEY }}
         port: 22
         script: |
-          # Ensure correct folder on the EC2 instance
-          cd /var/www/simpBack || mkdir -p /var/www/simpBack && cd /var/www/simpBack
-
-          # Stop any running app (if using PM2)
+          if ! command -v node &> /dev/null; then
+            curl -fsSL https://rpm.nodesource.com/setup_16.x | sudo bash -
+            sudo yum install -y nodejs
+          fi
+          if ! command -v pm2 &> /dev/null; then
+            sudo npm install -g pm2
+          fi
+          mkdir -p /home/ec2-user/simpBack
+          cd /home/ec2-user/simpBack
           pm2 stop all || echo "No app running"
-
-          # Clear existing files and sync the new files from the repository
           rm -rf *
-          scp -r $GITHUB_WORKSPACE/server/* . # Copy only the server directory contents
-
-          # Install dependencies
+          scp -r $GITHUB_WORKSPACE/server/* .
           npm install
-
-          # Start the server using PM2
           pm2 start server.js --name simpBack --watch
 
     - name: Notify Deployment
