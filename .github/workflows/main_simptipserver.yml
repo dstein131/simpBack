@@ -54,10 +54,23 @@ jobs:
         env:
           PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
         run: |
+          # Extract username and password from the publish profile
           USERNAME=$(echo "$PUBLISH_PROFILE" | grep -oP '(?<=userName=")[^"]+')
           PASSWORD=$(echo "$PUBLISH_PROFILE" | grep -oP '(?<=userPWD=")[^"]+')
+          
+          # Extract the publishUrl from the publish profile
+          PUBLISH_URL=$(echo "$PUBLISH_PROFILE" | grep -oP '(?<=publishUrl=")[^"]+')
+          
+          # Remove the port if present (e.g., :443)
+          HOST=$(echo "$PUBLISH_URL" | sed 's/:443$//')
+          
+          # Construct the Kudu API URL for the WebJob
           WEBJOB_NAME="ttsWorker"
-          KUDU_API_URL="https://simptipserver.scm.azurewebsites.net/api/continuouswebjobs/${WEBJOB_NAME}/upload"
+          KUDU_API_URL="https://${HOST}/api/continuouswebjobs/${WEBJOB_NAME}/upload"
+          
+          echo "Deploying Worker WebJob to Kudu API URL: $KUDU_API_URL"
+          
+          # Upload the WebJob zip file
           curl -X POST -u "$USERNAME:$PASSWORD" -F "file=@ttsWorker.zip" "$KUDU_API_URL"
 
       # Step 8: Clean up the zipped artifacts
