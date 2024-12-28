@@ -1,0 +1,49 @@
+name: Deploy Node.js Express Server
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '16' # Ensure this matches your project’s Node.js version
+
+    - name: Install Dependencies
+      run: npm install
+
+    - name: Deploy to EC2
+      uses: appleboy/ssh-action@v0.1.5
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_KEY }}
+        port: 22
+        script: |
+          # Navigate to the deployment directory on EC2
+          cd /var/www/simpback || mkdir -p /var/www/simpback && cd /var/www/simpback
+
+          # Stop any running app (if using PM2)
+          pm2 stop all || echo "No app running"
+
+          # Clear existing files and copy new files from GitHub Actions workspace
+          rm -rf *
+          scp -r $GITHUB_WORKSPACE/* .
+
+          # Install dependencies
+          npm install
+
+          # Start the server with PM2
+          pm2 start server/server.js --name simpback --watch
+
+    - name: Notify Deployment
+      run: echo "Deployment completed successfully!"
