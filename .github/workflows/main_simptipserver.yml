@@ -21,13 +21,13 @@ jobs:
 
       - name: Install dependencies and build
         run: |
-          cd simpback/server
+          cd simpBack/server
           npm install
           npm run build --if-present
 
       - name: Zip artifact for deployment
         run: |
-          cd simpback/server
+          cd simpBack/server
           zip -r ../../release.zip ./*
 
       - name: Deploy to Azure Web App
@@ -40,7 +40,7 @@ jobs:
 
       - name: Prepare Worker WebJob
         run: |
-          cd simpback/server
+          cd simpBack/server
           zip -r ../../ttsWorker.zip workers/ttsWorker.js package.json node_modules/
 
       - name: Deploy Worker as WebJob
