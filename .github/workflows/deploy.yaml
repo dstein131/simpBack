@@ -39,35 +39,25 @@ jobs:
             sudo npm install -g pm2
           fi
 
-          # Create directory and navigate
-          sudo mkdir -p /var/www/simpBack
-          sudo chown -R $USER:$USER /var/www/simpBack
-          cd /var/www/simpBack
+          # Create application directory
+          APP_DIR="/var/www/simpBack"
+          sudo mkdir -p $APP_DIR
+          sudo chown -R $USER:$USER $APP_DIR
+          cd $APP_DIR
 
-          # Stop running processes
+          # Stop running app
           pm2 stop all || echo "No app running"
 
-          # Clean existing files
-          rm -rf *
+          # Clean only the application directory
+          find $APP_DIR -mindepth 1 -delete
 
-          # Sync files from GitHub workspace
-          rsync -av --exclude='/proc' $GITHUB_WORKSPACE/ .
-
-          # Verify package.json exists
-          if [ ! -f "package.json" ]; then
-            echo "Error: package.json not found. Exiting."
-            exit 1
-          fi
+          # Sync application files (avoid /proc or system paths)
+          rsync -av --exclude='/proc' $GITHUB_WORKSPACE/server/ $APP_DIR/
 
           # Install dependencies
+          cd $APP_DIR
           npm install
 
-          # Verify server.js exists
-          if [ ! -f "server.js" ]; then
-            echo "Error: server.js not found. Exiting."
-            exit 1
-          fi
-
-          # Start the application with PM2
+          # Start application with PM2
           pm2 start server.js --name simpBack --watch
           pm2 save
