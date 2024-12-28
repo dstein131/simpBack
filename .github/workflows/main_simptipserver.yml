@@ -20,12 +20,15 @@ jobs:
 
       - name: npm install, build, and test
         run: |
+          cd server
           npm install
           npm run build --if-present
           npm run test --if-present
 
       - name: Zip artifact for deployment
-        run: zip release.zip ./* -r
+        run: |
+          cd server
+          zip -r ../release.zip ./*
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
@@ -46,7 +49,7 @@ jobs:
           name: node-app
 
       - name: Unzip artifact for deployment
-        run: unzip release.zip
+        run: unzip release.zip -d server
 
       - name: Login to Azure
         uses: azure/login@v2
@@ -61,7 +64,7 @@ jobs:
         with:
           app-name: 'simptipserver'
           slot-name: 'Production'
-          package: .
+          package: ./server
 
       - name: Prepare Worker WebJob
         run: |
@@ -78,4 +81,4 @@ jobs:
 
       - name: Clean Up
         run: |
-          rm release.zip ./server/ttsWorker.zip
+          rm release.zip server/ttsWorker.zip
