@@ -59,7 +59,7 @@ jobs:
 
             # Sync files to the application directory
             echo "Syncing files to /var/www/simpBack..."
-            rsync -avz --delete --exclude='node_modules' ~/actions-runner/_work/simpBack/server/ /var/www/simpBack/ || { echo "rsync failed"; exit 1; }
+            rsync -avz --delete --exclude='node_modules' ./ /var/www/simpBack/ || { echo "rsync failed"; exit 1; }
 
             # Navigate to the application directory
             cd /var/www/simpBack
