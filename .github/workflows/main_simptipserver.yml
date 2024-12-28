@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: '18.x'
 
-      # Step 3: Install dependencies and build the project
+      # Step 3: Build the project locally (without installing dependencies on the server)
       - name: Install dependencies and build
         run: |
           cd server
@@ -39,7 +39,7 @@ jobs:
             exit 1
           fi
 
-      # Step 5: Zip the build artifacts for deployment
+      # Step 5: Zip the source code (excluding node_modules)
       - name: Zip artifact for deployment
         run: |
           cd server
@@ -68,8 +68,6 @@ jobs:
             echo "Error: ttsWorker.zip was not created."
             exit 1
           fi
-
-
 
       # Step 8: Deploy the Worker WebJob to Azure
       - name: Deploy Worker as WebJob
@@ -113,4 +111,3 @@ jobs:
       - name: Clean Up
         run: |
           rm release.zip ttsWorker.zip
-
