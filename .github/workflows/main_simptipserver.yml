@@ -25,16 +25,27 @@ jobs:
       - name: Install dependencies and build
         run: |
           cd server
-          npm install
+          npm ci
           npm run build --if-present
 
-      # Step 4: Zip the build artifacts for deployment
+      # Step 4: Verify Installation of jsonwebtoken
+      - name: Verify jsonwebtoken Installation
+        run: |
+          cd server
+          if [ -d "node_modules/jsonwebtoken" ]; then
+            echo "✅ jsonwebtoken is installed."
+          else
+            echo "❌ jsonwebtoken is NOT installed."
+            exit 1
+          fi
+
+      # Step 5: Zip the build artifacts for deployment
       - name: Zip artifact for deployment
         run: |
           cd server
-          zip -r ../release.zip ./*
+          zip -r ../release.zip ./* -x "node_modules/*" "logs/*" "*.git*" "*.github*" "README.md"
 
-      # Step 5: Deploy the zipped artifact to Azure Web App
+      # Step 6: Deploy the zipped artifact to Azure Web App with Remote Build
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v2
         with:
@@ -43,19 +54,19 @@ jobs:
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: ./release.zip
 
-      # Step 6: Prepare the Worker WebJob package
+      # Step 7: Prepare the Worker WebJob package
       - name: Prepare Worker WebJob
         run: |
           cd server
-          # Install dependencies for the WebJob in a separate directory
+          # Create a separate directory for the worker deployment
           mkdir worker_deploy
           cp workers/ttsWorker.js worker_deploy/
           cp package.json worker_deploy/
           cd worker_deploy
-          npm install
-          zip -r ../ttsWorker.zip ./*
+          npm ci --only=production
+          zip -r ../ttsWorker.zip ./* -x "node_modules/*" "logs/*" "*.git*" "*.github*" "README.md"
 
-      # Step 7: Deploy the Worker WebJob to Azure
+      # Step 8: Deploy the Worker WebJob to Azure
       - name: Deploy Worker as WebJob
         env:
           PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
@@ -63,37 +74,37 @@ jobs:
           # Extract username and password from the publish profile
           USERNAME=$(echo "$PUBLISH_PROFILE" | grep -oP '(?<=userName=")[^"]+')
           PASSWORD=$(echo "$PUBLISH_PROFILE" | grep -oP '(?<=userPWD=")[^"]+')
-          
+
           # Extract the publishUrl for MSDeploy from the publish profile
           PUBLISH_URL=$(echo "$PUBLISH_PROFILE" | grep -oP '<publishProfile[^>]*publishMethod="MSDeploy"[^>]*publishUrl="\K[^"]+')
-          
+
           # Validate that only one publishUrl is extracted
           PUBLISH_URL_COUNT=$(echo "$PUBLISH_URL" | wc -l)
           if [ "$PUBLISH_URL_COUNT" -ne 1 ]; then
             echo "Error: Expected exactly one MSDeploy publishUrl, but found $PUBLISH_URL_COUNT."
             exit 1
           fi
-          
+
           # Remove the port if present (e.g., :443)
           HOST=$(echo "$PUBLISH_URL" | sed 's/:443$//')
-          
+
           # Construct the Kudu API URL for the WebJob
           WEBJOB_NAME="ttsWorker"
           KUDU_API_URL="https://${HOST}/api/continuouswebjobs/${WEBJOB_NAME}/upload"
-          
+
           # Log the Kudu API URL (excluding sensitive information)
           echo "Deploying Worker WebJob to Kudu API URL: $KUDU_API_URL"
-          
+
           # Upload the WebJob zip file
           curl -X POST -u "$USERNAME:$PASSWORD" -F "file=@ttsWorker.zip" "$KUDU_API_URL"
-          
+
           # Check if curl succeeded
           if [ $? -ne 0 ]; then
             echo "Error: Failed to deploy Worker WebJob."
             exit 1
           fi
 
-      # Step 8: Clean up the zipped artifacts
+      # Step 9: Clean up the zipped artifacts
       - name: Clean Up
         run: |
           rm release.zip ttsWorker.zip
