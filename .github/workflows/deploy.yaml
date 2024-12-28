@@ -39,53 +39,35 @@ jobs:
               sudo npm install -g pm2
             fi
 
-            # Create application directory
+            # Define application directory
             APP_DIR="/var/www/simpBack"
+            SERVER_SOURCE_DIR="$GITHUB_WORKSPACE/server"
+
+            # Create application directory
             sudo mkdir -p $APP_DIR
             sudo chown -R $USER:$USER $APP_DIR
+
+            # Sync application files (only server folder)
+            rsync -avz --delete --exclude='node_modules' $SERVER_SOURCE_DIR/ $APP_DIR/
+
+            # Move into application directory
             cd $APP_DIR
 
-            # Stop running app
-            pm2 stop all || echo "No app running"
-
-            # Clean only the application directory, excluding sensitive paths
-            find $APP_DIR -mindepth 1 -not -path "$APP_DIR/proc/*" -delete
-
-            # Sync application files
-            rsync -av --exclude='/proc' $GITHUB_WORKSPACE/server/ $APP_DIR/
-
-            # Install dependencies
-            cd $APP_DIR
-            npm install
-
-            # Start application with PM2
-            pm2 start server.js --name simpBack --watch
-            pm2 save
-
-      - name: Sync Application to S3
-        uses: appleboy/ssh-action@v0.1.5
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
-          port: 22
-          script: |
-            AWS_BUCKET_NAME="simp-tip-server"
-            AWS_REGION="us-east-1"
-            APP_DIR="/var/www/simpBack"
-
-            # Ensure unzip is installed
-            if ! command -v unzip &> /dev/null; then
-              sudo apt-get update && sudo apt-get install -y unzip
+            # Check if package.json exists
+            if [ -f package.json ]; then
+              echo "Installing dependencies..."
+              npm install
+            else
+              echo "Error: package.json not found in $APP_DIR"
+              exit 1
             fi
 
-            # Install AWS CLI if not already installed
-            if ! command -v aws &> /dev/null; then
-              curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-              unzip awscliv2.zip
-              sudo ./aws/install
-              export PATH=$PATH:/usr/local/bin/aws
+            # Check if server.js exists
+            if [ -f server.js ]; then
+              echo "Starting the application with PM2..."
+              pm2 start server.js --name simpBack --watch
+              pm2 save
+            else
+              echo "Error: server.js not found in $APP_DIR"
+              exit 1
             fi
-
-            # Sync application files to S3
-            aws s3 sync $APP_DIR s3://$AWS_BUCKET_NAME/ --region $AWS_REGION
