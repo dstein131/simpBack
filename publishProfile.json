@@ -1,0 +1,46 @@
+[
+  {
+    "SQLServerDBConnectionString": "",
+    "controlPanelLink": "https://portal.azure.com",
+    "databases": null,
+    "destinationAppUrl": "https://simptipserver-fzdpgdhfc0hqa3ht.canadacentral-01.azurewebsites.net",
+    "hostingProviderForumLink": "",
+    "msdeploySite": "simptipserver",
+    "mySQLDBConnectionString": "",
+    "profileName": "simptipserver - Web Deploy",
+    "publishMethod": "MSDeploy",
+    "publishUrl": "simptipserver-fzdpgdhfc0hqa3ht.scm.canadacentral-01.azurewebsites.net:443",
+    "userName": "$simptipserver",
+    "userPWD": "1vi5qDeXjQzNlq0R4Arwnhi4YRmjFeggjqdK8eGi3cCQQfRxNX8qcfzyot5G",
+    "webSystem": "WebSites"
+  },
+  {
+    "SQLServerDBConnectionString": "",
+    "controlPanelLink": "https://portal.azure.com",
+    "databases": null,
+    "destinationAppUrl": "https://simptipserver-fzdpgdhfc0hqa3ht.canadacentral-01.azurewebsites.net",
+    "ftpPassiveMode": "True",
+    "hostingProviderForumLink": "",
+    "mySQLDBConnectionString": "",
+    "profileName": "simptipserver - FTP",
+    "publishMethod": "FTP",
+    "publishUrl": "ftps://waws-prod-yt1-069.ftp.azurewebsites.windows.net/site/wwwroot",
+    "userName": "simptipserver\\$simptipserver",
+    "userPWD": "1vi5qDeXjQzNlq0R4Arwnhi4YRmjFeggjqdK8eGi3cCQQfRxNX8qcfzyot5G",
+    "webSystem": "WebSites"
+  },
+  {
+    "SQLServerDBConnectionString": "",
+    "controlPanelLink": "https://portal.azure.com",
+    "databases": null,
+    "destinationAppUrl": "https://simptipserver-fzdpgdhfc0hqa3ht.canadacentral-01.azurewebsites.net",
+    "hostingProviderForumLink": "",
+    "mySQLDBConnectionString": "",
+    "profileName": "simptipserver - Zip Deploy",
+    "publishMethod": "ZipDeploy",
+    "publishUrl": "simptipserver-fzdpgdhfc0hqa3ht.scm.canadacentral-01.azurewebsites.net:443",
+    "userName": "$simptipserver",
+    "userPWD": "1vi5qDeXjQzNlq0R4Arwnhi4YRmjFeggjqdK8eGi3cCQQfRxNX8qcfzyot5G",
+    "webSystem": "WebSites"
+  }
+]
