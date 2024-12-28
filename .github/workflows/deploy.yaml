@@ -53,26 +53,20 @@ jobs:
             fi
 
             # Application directory on the server
-            APP_DIR="/var/www/simpBack"
-            SERVER_SOURCE_DIR="$HOME/actions-runner/_work/simpBack/server"
-
-            echo "Application Directory: $APP_DIR"
-            echo "Server Source Directory: $SERVER_SOURCE_DIR"
-
-            # Create application directory if it doesn't exist
-            sudo mkdir -p $APP_DIR
-            sudo chown -R $USER:$USER $APP_DIR
+            echo "Creating application directory..."
+            sudo mkdir -p /var/www/simpBack
+            sudo chown -R $USER:$USER /var/www/simpBack
 
             # Sync files to the application directory
-            echo "Syncing files to the application directory..."
-            rsync -avz --delete --exclude='node_modules' "$SERVER_SOURCE_DIR/" "$APP_DIR/" || { echo "rsync failed"; exit 1; }
+            echo "Syncing files to /var/www/simpBack..."
+            rsync -avz --delete --exclude='node_modules' ~/actions-runner/_work/simpBack/server/ /var/www/simpBack/ || { echo "rsync failed"; exit 1; }
 
             # Navigate to the application directory
-            cd $APP_DIR
+            cd /var/www/simpBack
 
             # Check for package.json
             if [ ! -f package.json ]; then
-              echo "Error: package.json not found in $APP_DIR. Exiting."
+              echo "Error: package.json not found in /var/www/simpBack. Exiting."
               exit 1
             fi
 
@@ -82,7 +76,7 @@ jobs:
 
             # Check for server.js
             if [ ! -f server.js ]; then
-              echo "Error: server.js not found in $APP_DIR. Exiting."
+              echo "Error: server.js not found in /var/www/simpBack. Exiting."
               exit 1
             fi
 
