@@ -53,8 +53,8 @@ jobs:
             fi
 
             # Application directory on the server
-            APP_DIR="/var/www/simpBack"
-            SERVER_SOURCE_DIR="$HOME/actions-runner/_work/simpBack/simpBack/server"
+            APP_DIR="/var/www/simpBack/server"
+            SERVER_SOURCE_DIR="$HOME/actions-runner/_work/simpBack/server"
 
             echo "Application Directory: $APP_DIR"
             echo "Server Source Directory: $SERVER_SOURCE_DIR"
