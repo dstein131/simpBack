@@ -16,7 +16,7 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v3
       with:
-        node-version: '16'
+        node-version: '20'
 
     - name: Deploy to EC2
       uses: appleboy/ssh-action@v0.1.5
@@ -26,9 +26,11 @@ jobs:
         key: ${{ secrets.EC2_KEY }}
         port: 22
         script: |
+          export DEBIAN_FRONTEND=noninteractive
+
           # Ensure Node.js is installed
           if ! command -v node &> /dev/null; then
-            curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
+            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
             sudo apt-get install -y nodejs
           fi
 
@@ -49,10 +51,23 @@ jobs:
           rm -rf *
 
           # Copy files from GitHub Actions workspace
-          scp -r $GITHUB_WORKSPACE/server/* .
+          cp -r $GITHUB_WORKSPACE/* .
+
+          # Verify package.json exists
+          if [ ! -f "package.json" ]; then
+            echo "Error: package.json not found. Exiting."
+            exit 1
+          fi
 
           # Install dependencies
           npm install
 
+          # Verify server.js exists
+          if [ ! -f "server.js" ]; then
+            echo "Error: server.js not found. Exiting."
+            exit 1
+          fi
+
           # Start the application with PM2
           pm2 start server.js --name simpBack --watch
+          pm2 save
