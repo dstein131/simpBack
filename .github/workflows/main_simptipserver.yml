@@ -58,13 +58,17 @@ jobs:
       - name: Prepare Worker WebJob
         run: |
           cd server
-          # Create a separate directory for the worker deployment
           mkdir worker_deploy
           cp workers/ttsWorker.js worker_deploy/
           cp package.json worker_deploy/
           cd worker_deploy
           npm install --omit=dev
           zip -r ../../ttsWorker.zip ./*
+          if [ ! -f ../../ttsWorker.zip ]; then
+            echo "Error: ttsWorker.zip was not created."
+            exit 1
+          fi
+
 
 
       # Step 8: Deploy the Worker WebJob to Azure
