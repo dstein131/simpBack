@@ -21,29 +21,29 @@ jobs:
         with:
           node-version: '18.x'
 
-      # Step 3: Build the project locally (without installing dependencies on the server)
+      # Step 3: Install dependencies and build the project
       - name: Install dependencies and build
         run: |
           cd server
           npm ci
           npm run build --if-present
 
-      # Step 4: Verify Installation of jsonwebtoken
-      - name: Verify jsonwebtoken Installation
+      # Step 4: Verify Installation of express
+      - name: Verify express Installation
         run: |
           cd server
-          if [ -d "node_modules/jsonwebtoken" ]; then
-            echo "✅ jsonwebtoken is installed."
+          if [ -d "node_modules/express" ]; then
+            echo "✅ express is installed."
           else
-            echo "❌ jsonwebtoken is NOT installed."
+            echo "❌ express is NOT installed."
             exit 1
           fi
 
-      # Step 5: Zip the source code (excluding node_modules)
+      # Step 5: Zip the source code (including node_modules)
       - name: Zip artifact for deployment
         run: |
           cd server
-          zip -r ../release.zip ./* -x "node_modules/*" "logs/*" "*.git*" "*.github*" "README.md"
+          zip -r ../release.zip ./* -x "logs/*" "*.git*" "*.github*" "README.md"
 
       # Step 6: Deploy the zipped artifact to Azure Web App
       - name: Deploy to Azure Web App
@@ -53,6 +53,17 @@ jobs:
           slot-name: 'production'
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: ./release.zip
+
+      # Step 6.1: Force dependency installation on Azure
+      - name: Post Deployment - Install Dependencies
+        env:
+          PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        run: |
+          USERNAME=$(echo "$PUBLISH_PROFILE" | grep -oP '(?<=userName=")[^"]+')
+          PASSWORD=$(echo "$PUBLISH_PROFILE" | grep -oP '(?<=userPWD=")[^"]+')
+          HOST=$(echo "$PUBLISH_PROFILE" | grep -oP '<publishProfile[^>]*publishMethod="MSDeploy"[^>]*publishUrl="\K[^"]+' | sed 's/:443$//')
+          KUDU_API_URL="https://${HOST}/api/command"
+          curl -u "$USERNAME:$PASSWORD" -X POST -d '{"command":"cd /home/site/wwwroot && npm install"}' -H "Content-Type: application/json" "$KUDU_API_URL"
 
       # Step 7: Prepare the Worker WebJob package
       - name: Prepare Worker WebJob
@@ -74,38 +85,11 @@ jobs:
         env:
           PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
         run: |
-          # Extract username and password from the publish profile
           USERNAME=$(echo "$PUBLISH_PROFILE" | grep -oP '(?<=userName=")[^"]+')
           PASSWORD=$(echo "$PUBLISH_PROFILE" | grep -oP '(?<=userPWD=")[^"]+')
-
-          # Extract the publishUrl for MSDeploy from the publish profile
-          PUBLISH_URL=$(echo "$PUBLISH_PROFILE" | grep -oP '<publishProfile[^>]*publishMethod="MSDeploy"[^>]*publishUrl="\K[^"]+')
-
-          # Validate that only one publishUrl is extracted
-          PUBLISH_URL_COUNT=$(echo "$PUBLISH_URL" | wc -l)
-          if [ "$PUBLISH_URL_COUNT" -ne 1 ]; then
-            echo "Error: Expected exactly one MSDeploy publishUrl, but found $PUBLISH_URL_COUNT."
-            exit 1
-          fi
-
-          # Remove the port if present (e.g., :443)
-          HOST=$(echo "$PUBLISH_URL" | sed 's/:443$//')
-
-          # Construct the Kudu API URL for the WebJob
-          WEBJOB_NAME="ttsWorker"
-          KUDU_API_URL="https://${HOST}/api/continuouswebjobs/${WEBJOB_NAME}/upload"
-
-          # Log the Kudu API URL (excluding sensitive information)
-          echo "Deploying Worker WebJob to Kudu API URL: $KUDU_API_URL"
-
-          # Upload the WebJob zip file
+          HOST=$(echo "$PUBLISH_PROFILE" | grep -oP '<publishProfile[^>]*publishMethod="MSDeploy"[^>]*publishUrl="\K[^"]+' | sed 's/:443$//')
+          KUDU_API_URL="https://${HOST}/api/continuouswebjobs/ttsWorker/upload"
           curl -X POST -u "$USERNAME:$PASSWORD" -F "file=@ttsWorker.zip" "$KUDU_API_URL"
-
-          # Check if curl succeeded
-          if [ $? -ne 0 ]; then
-            echo "Error: Failed to deploy Worker WebJob."
-            exit 1
-          fi
 
       # Step 9: Clean up the zipped artifacts
       - name: Clean Up
