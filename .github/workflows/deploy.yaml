@@ -50,8 +50,8 @@ jobs:
           # Clean existing files
           rm -rf *
 
-          # Copy files from GitHub Actions workspace
-          cp -r $GITHUB_WORKSPACE/* .
+          # Sync files from GitHub workspace
+          rsync -av --exclude='/proc' $GITHUB_WORKSPACE/ .
 
           # Verify package.json exists
           if [ ! -f "package.json" ]; then
