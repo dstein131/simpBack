@@ -16,9 +16,10 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v3
       with:
-        node-version: '16' # Ensure this matches your project’s Node.js version
+        node-version: '16'
 
     - name: Install Dependencies
+      working-directory: ./server # Ensure we're working in the server directory
       run: npm install
 
     - name: Deploy to EC2
@@ -29,21 +30,21 @@ jobs:
         key: ${{ secrets.EC2_KEY }}
         port: 22
         script: |
-          # Navigate to the deployment directory on EC2
-          cd /var/www/simpback || mkdir -p /var/www/simpback && cd /var/www/simpback
+          # Ensure correct folder on the EC2 instance
+          cd /var/www/simpBack || mkdir -p /var/www/simpBack && cd /var/www/simpBack
 
           # Stop any running app (if using PM2)
           pm2 stop all || echo "No app running"
 
-          # Clear existing files and copy new files from GitHub Actions workspace
+          # Clear existing files and sync the new files from the repository
           rm -rf *
-          scp -r $GITHUB_WORKSPACE/* .
+          scp -r $GITHUB_WORKSPACE/server/* . # Copy only the server directory contents
 
           # Install dependencies
           npm install
 
-          # Start the server with PM2
-          pm2 start server/server.js --name simpback --watch
+          # Start the server using PM2
+          pm2 start server.js --name simpBack --watch
 
     - name: Notify Deployment
       run: echo "Deployment completed successfully!"
