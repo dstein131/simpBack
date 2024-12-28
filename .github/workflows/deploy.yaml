@@ -59,13 +59,19 @@ jobs:
             echo "Application Directory: $APP_DIR"
             echo "Server Source Directory: $SERVER_SOURCE_DIR"
 
+            # Debugging: Verify the SERVER_SOURCE_DIR
+            if [ ! -d "$SERVER_SOURCE_DIR" ]; then
+              echo "Error: Source directory $SERVER_SOURCE_DIR does not exist. Exiting."
+              exit 1
+            fi
+
             # Create application directory if it doesn't exist
             sudo mkdir -p $APP_DIR
             sudo chown -R $USER:$USER $APP_DIR
 
-            # Sync files to the server directory
+            # Sync files to the application directory
             echo "Syncing files to the application directory..."
-            rsync -avz --delete --exclude='node_modules' "$SERVER_SOURCE_DIR/" "$APP_DIR/"
+            rsync -avz --delete --exclude='node_modules' "$SERVER_SOURCE_DIR/" "$APP_DIR/" || { echo "rsync failed"; exit 1; }
 
             # Navigate to the application directory
             cd $APP_DIR
