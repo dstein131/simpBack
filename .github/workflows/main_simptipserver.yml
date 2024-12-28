@@ -58,8 +58,15 @@ jobs:
           USERNAME=$(echo "$PUBLISH_PROFILE" | grep -oP '(?<=userName=")[^"]+')
           PASSWORD=$(echo "$PUBLISH_PROFILE" | grep -oP '(?<=userPWD=")[^"]+')
           
-          # Extract the publishUrl from the publish profile
-          PUBLISH_URL=$(echo "$PUBLISH_PROFILE" | grep -oP '(?<=publishUrl=")[^"]+')
+          # Extract the publishUrl for MSDeploy from the publish profile
+          PUBLISH_URL=$(echo "$PUBLISH_PROFILE" | grep -oP '<publishProfile[^>]*publishMethod="MSDeploy"[^>]*publishUrl="\K[^"]+')
+          
+          # Validate that only one publishUrl is extracted
+          PUBLISH_URL_COUNT=$(echo "$PUBLISH_URL" | wc -l)
+          if [ "$PUBLISH_URL_COUNT" -ne 1 ]; then
+            echo "Error: Expected exactly one MSDeploy publishUrl, but found $PUBLISH_URL_COUNT."
+            exit 1
+          fi
           
           # Remove the port if present (e.g., :443)
           HOST=$(echo "$PUBLISH_URL" | sed 's/:443$//')
@@ -68,10 +75,17 @@ jobs:
           WEBJOB_NAME="ttsWorker"
           KUDU_API_URL="https://${HOST}/api/continuouswebjobs/${WEBJOB_NAME}/upload"
           
+          # Log the Kudu API URL (excluding sensitive information)
           echo "Deploying Worker WebJob to Kudu API URL: $KUDU_API_URL"
           
           # Upload the WebJob zip file
           curl -X POST -u "$USERNAME:$PASSWORD" -F "file=@ttsWorker.zip" "$KUDU_API_URL"
+          
+          # Check if curl succeeded
+          if [ $? -ne 0 ]; then
+            echo "Error: Failed to deploy Worker WebJob."
+            exit 1
+          fi
 
       # Step 8: Clean up the zipped artifacts
       - name: Clean Up
