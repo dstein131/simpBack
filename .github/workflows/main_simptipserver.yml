@@ -64,7 +64,8 @@ jobs:
           cp package.json worker_deploy/
           cd worker_deploy
           npm install --omit=dev
-          zip -r ../ttsWorker.zip ./* -x "node_modules/*" "logs/*" "*.git*" "*.github*" "README.md"
+          zip -r ../../ttsWorker.zip ./*
+
 
       # Step 8: Deploy the Worker WebJob to Azure
       - name: Deploy Worker as WebJob
