@@ -10,15 +10,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Step 1: Checkout the repository
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+      # Step 2: Setup SSH Agent and add the SSH key
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.5.3
         with:
-          node-version: '20'
+          ssh-private-key: ${{ secrets.EC2_KEY }}
 
-      - name: Deploy to EC2
+      # Step 3: Rsync Files to EC2
+      - name: Rsync Files to EC2
+        uses: timvisee/action-rsync@v2.0.0
+        with:
+          # Source directory on the runner
+          source: "./server/"
+          
+          # Destination directory on EC2
+          destination: "/var/www/simpBack/"
+          
+          # Rsync arguments
+          args: "--archive --delete --exclude 'node_modules'"
+          
+          # EC2 connection details
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          port: 22
+
+      # Step 4: Execute Deployment Script on EC2
+      - name: Execute Deployment Script on EC2
         uses: appleboy/ssh-action@v0.1.5
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -30,7 +51,14 @@ jobs:
 
             echo "Starting Deployment Script"
 
-            # Ensure Node.js and npm are installed
+            # Navigate to the application directory
+            cd /var/www/simpBack
+
+            # Debugging: List files to verify transfer
+            echo "Listing files in /var/www/simpBack:"
+            ls -la
+
+            # Ensure Node.js is installed
             if ! command -v node &> /dev/null; then
               echo "Node.js not found. Installing..."
               curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
@@ -39,6 +67,7 @@ jobs:
               echo "Node.js is already installed."
             fi
 
+            # Ensure npm is installed
             if ! command -v npm &> /dev/null; then
               echo "npm is not installed. Exiting."
               exit 1
@@ -50,24 +79,6 @@ jobs:
               sudo npm install -g pm2
             else
               echo "PM2 is already installed."
-            fi
-
-            # Application directory on the server
-            echo "Creating application directory..."
-            sudo mkdir -p /var/www/simpBack
-            sudo chown -R $USER:$USER /var/www/simpBack
-
-            # Sync files to the application directory
-            echo "Syncing files to /var/www/simpBack..."
-            rsync -avz --delete --exclude='node_modules' ./server/ /var/www/simpBack/ || { echo "rsync failed"; exit 1; }
-
-            # Navigate to the application directory
-            cd /var/www/simpBack
-
-            # Check for package.json
-            if [ ! -f package.json ]; then
-              echo "Error: package.json not found in /var/www/simpBack. Exiting."
-              exit 1
             fi
 
             # Install dependencies
