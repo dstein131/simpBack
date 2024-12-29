@@ -37,7 +37,7 @@ jobs:
           script: |
             # Navigate to the app directory or clone if not present
             if [ ! -d "/home/ec2-user/simpBack/server" ]; then
-              git clone https://github.com/your-username/simpBack.git /home/ec2-user/simpBack
+              git clone https://github.com/dstein131/simpBack.git /home/ec2-user/simpBack
             fi
             cd /home/ec2-user/simpBack/server
             git pull origin main
