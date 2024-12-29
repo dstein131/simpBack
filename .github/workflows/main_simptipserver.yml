@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: 18
 
-      # 3. Install dependencies
+      # 3. Install dependencies (if needed for build)
       - name: Install Dependencies
         run: |
           cd server
@@ -55,19 +55,28 @@ jobs:
             chmod 600 ~/.ssh/github_deploy_key
 
             # 5c. Configure SSH to use the deploy key for GitHub
-            echo -e "Host github.com\n  HostName github.com\n  User git\n  IdentityFile ~/.ssh/github_deploy_key\n" > ~/.ssh/config
+            cat <<EOF > ~/.ssh/config
+            Host github.com
+              HostName github.com
+              User git
+              IdentityFile ~/.ssh/github_deploy_key
+            EOF
             chmod 600 ~/.ssh/config
 
-            # 5d. Clone the repository if it doesn't exist
+            # 5d. Verify SSH Authentication to GitHub
+            ssh -T git@github.com || true
+
+            # 5e. Clone the repository if it doesn't exist
             if [ ! -d "/home/ec2-user/simpBack" ]; then
               git clone git@github.com:dstein131/simpBack.git /home/ec2-user/simpBack
+            else
+              # If the repository exists, navigate and pull the latest changes
+              cd /home/ec2-user/simpBack
+              git pull origin main
             fi
 
-            # 5e. Navigate to the server directory
+            # 5f. Navigate to the server directory
             cd /home/ec2-user/simpBack/server
-
-            # 5f. Pull the latest changes
-            git pull origin main
 
             # 5g. Install dependencies
             npm install
