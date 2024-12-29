@@ -225,3 +225,4 @@ process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception:', error);
   process.exit(1); // Optional: Exit the process if necessary
 });
+
