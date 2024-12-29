@@ -36,10 +36,10 @@ jobs:
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
+          host: ${{ secrets.EC2_HOST }}                # Your EC2 instance's public DNS or IP
+          username: ec2-user                            # Replace with your EC2 username if different
+          key: ${{ secrets.EC2_SSH_KEY }}               # The private key stored in GitHub Secrets
+          port: 22                                      # SSH port (default is 22)
           script: |
             #!/bin/bash
             set -e
