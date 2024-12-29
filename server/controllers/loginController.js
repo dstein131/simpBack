@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const db = require('../db'); // Updated to use the index.js
 
+
 // User Login
 exports.loginUser = async (req, res) => {
   try {
