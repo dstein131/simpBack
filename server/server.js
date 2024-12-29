@@ -11,6 +11,7 @@ const routes = require('./routes'); // Import all routes
 const socket = require('./socket'); // Shared Socket.IO instance
 const ttsQueue = require('./queues/ttsQueue'); // Import the TTS queue
 const db = require('./db'); // Now correctly requires server/db/index.js
+const logger = require('./logger'); // Import the Winston logger
 
 /*********************************************
  *  LOAD ENVIRONMENT VARIABLES
@@ -33,6 +34,19 @@ app.use(cors({
 app.use(express.json());
 
 /*********************************************
+ *  REQUEST LOGGING MIDDLEWARE
+ ********************************************/
+app.use((req, res, next) => {
+  logger.info(`Incoming Request: ${req.method} ${req.url}`);
+  
+  res.on('finish', () => {
+    logger.info(`Response: ${req.method} ${req.url} - Status: ${res.statusCode}`);
+  });
+  
+  next();
+});
+
+/*********************************************
  *  SERVE STATIC TTS AUDIO FILES
  ********************************************/
 // Serve the 'tts_audios' directory for accessing generated audio files
@@ -46,7 +60,7 @@ const io = socket.init(server);
 
 // Handle Socket.IO connections
 io.on('connection', (socket) => {
-  logger.info('✅ User connected:', socket.id);
+  logger.info(`✅ User connected: ${socket.id}`);
 
   // Join a specific streamer room
   socket.on('join-streamer-room', (roomId) => {
@@ -63,7 +77,7 @@ io.on('connection', (socket) => {
 
   // Handle disconnections
   socket.on('disconnect', () => {
-    logger.info('❌ User disconnected:', socket.id);
+    logger.info(`❌ User disconnected: ${socket.id}`);
   });
 });
 
@@ -79,6 +93,15 @@ app.get('/', (req, res) => {
 app.use('/api', routes);
 
 /*********************************************
+ *  ERROR HANDLING MIDDLEWARE
+ ********************************************/
+// Catch-all error handler
+app.use((err, req, res, next) => {
+  logger.error(`Express Error Handler: ${err.message}`, { stack: err.stack });
+  res.status(500).json({ error: 'Internal Server Error' });
+});
+
+/*********************************************
  *  START WORKER AS CHILD PROCESS
  ********************************************/
 const workerPath = path.join(__dirname, 'workers/ttsWorker.js');
@@ -87,16 +110,19 @@ const startWorker = () => {
   const worker = fork(workerPath);
 
   // Log messages from the worker
-  worker.on('message', (msg) => logger.info('[Worker Message]:', msg));
+  worker.on('message', (msg) => logger.info(`[Worker Message]: ${msg}`));
 
   // Handle worker errors
-  worker.on('error', (err) => console.error('[Worker Error]:', err));
+  worker.on('error', (err) => logger.error(`[Worker Error]: ${err.message}`, { stack: err.stack }));
 
   // Restart worker if it exits unexpectedly
-  worker.on('exit', (code) => {
-    console.error(`[Worker] exited with code ${code}`);
-    logger.info('[Worker] Restarting...');
-    startWorker();
+  worker.on('exit', (code, signal) => {
+    if (code !== 0) {
+      logger.error(`[Worker] exited with code ${code} and signal ${signal}. Restarting...`);
+      startWorker();
+    } else {
+      logger.info(`[Worker] exited gracefully with code ${code}.`);
+    }
   });
 };
 
@@ -122,7 +148,7 @@ ttsQueue.on('completed', async (job, result) => {
     );
 
     if (rows.length === 0) {
-      console.error('❌ No TTS request found with ID:', ttsRequestId);
+      logger.error('❌ No TTS request found with ID:', ttsRequestId);
       return;
     }
 
@@ -138,7 +164,7 @@ ttsQueue.on('completed', async (job, result) => {
 
     logger.info(`✅ TTS Request ${job.id} completed for TTS Request ID ${ttsRequestId}`);
   } catch (err) {
-    console.error('❌ Error handling completed TTS job:', err);
+    logger.error('❌ Error handling completed TTS job:', err);
   }
 });
 
@@ -156,7 +182,7 @@ ttsQueue.on('failed', async (job, err) => {
     );
 
     if (rows.length === 0) {
-      console.error('❌ No TTS request found with ID:', ttsRequestId);
+      logger.error('❌ No TTS request found with ID:', ttsRequestId);
       return;
     }
 
@@ -170,9 +196,9 @@ ttsQueue.on('failed', async (job, err) => {
       error: err.message,
     });
 
-    console.error(`❌ TTS Request ${job.id} failed for TTS Request ID ${ttsRequestId}: ${err.message}`);
+    logger.error(`❌ TTS Request ${job.id} failed for TTS Request ID ${ttsRequestId}: ${err.message}`, { error: err });
   } catch (error) {
-    console.error('❌ Error handling failed TTS job:', error);
+    logger.error('❌ Error handling failed TTS job:', error);
   }
 });
 
@@ -180,8 +206,22 @@ ttsQueue.on('failed', async (job, err) => {
  *  START THE SERVER
  ********************************************/
 const PORT = process.env.PORT || 5000;
+
 server.listen(PORT, '0.0.0.0', () => {
   logger.info(`✅ Server is running on http://localhost:${PORT}`);
   logger.debug(`Environment PORT: ${process.env.PORT}`);
 });
 
+/*********************************************
+ *  PROCESS LEVEL ERROR HANDLING
+ ********************************************/
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception:', error);
+  process.exit(1); // Optional: Exit the process if necessary
+});
