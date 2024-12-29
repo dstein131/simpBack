@@ -50,8 +50,10 @@ jobs:
             ssh-keyscan github.com >> ~/.ssh/known_hosts
             chmod 644 ~/.ssh/known_hosts
 
-            # 5b. Transfer the GitHub deploy key to EC2
-            echo "${{ secrets.EC2_GITHUB_DEPLOY_KEY }}" > ~/.ssh/github_deploy_key
+            # 5b. Transfer the GitHub deploy key to EC2 using a heredoc to preserve formatting
+            cat <<EOF > ~/.ssh/github_deploy_key
+            ${{ secrets.EC2_GITHUB_DEPLOY_KEY }}
+            EOF
             chmod 600 ~/.ssh/github_deploy_key
 
             # 5c. Configure SSH to use the deploy key for GitHub
@@ -66,11 +68,10 @@ jobs:
             # 5d. Verify SSH Authentication to GitHub
             ssh -T git@github.com || true
 
-            # 5e. Clone the repository if it doesn't exist
+            # 5e. Clone the repository if it doesn't exist, else pull the latest changes
             if [ ! -d "/home/ec2-user/simpBack" ]; then
               git clone git@github.com:dstein131/simpBack.git /home/ec2-user/simpBack
             else
-              # If the repository exists, navigate and pull the latest changes
               cd /home/ec2-user/simpBack
               git pull origin main
             fi
