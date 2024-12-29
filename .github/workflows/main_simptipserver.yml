@@ -42,7 +42,7 @@ jobs:
           port: 22
           script: |
             # Navigate to the app directory or clone if not present
-            if [ ! -d "/home/ec2-user/simpBack/server" ]; then
+            if [ ! -d "/home/ec2-user/simpBack" ]; then
               git clone https://github.com/dstein131/simpBack.git /home/ec2-user/simpBack
             fi
             cd /home/ec2-user/simpBack/server
@@ -53,5 +53,5 @@ jobs:
 
             # Restart the application using PM2
             pm2 stop express-app || true
-            pm2 start server.js --name "express-app"
+            pm2 start /home/ec2-user/simpBack/server/server.js --name "express-app"
             pm2 save
