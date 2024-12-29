@@ -4,15 +4,15 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_WEBAPP_NAME: simptipserver    # Set this to your application's name
-  AZURE_WEBAPP_PACKAGE_PATH: './server/dist'  # Path to your build output directory
-  NODE_VERSION: '18.x'                # Node.js version to use
+  AZURE_WEBAPP_NAME: simptipserver       # Your Azure WebApp name
+  AZURE_WEBAPP_PACKAGE_PATH: './dist'    # Updated path to build output
+  NODE_VERSION: '18.x'                    # Node.js version
 
 permissions:
   contents: read
 
 jobs:
-  build_and_deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,14 +22,39 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: './server/package-lock.json'  # Point to server's lock file
+          cache-dependency-path: './server/package-lock.json'  # Path to lock file
 
       - name: npm install, build, and test
-        working-directory: ./server  # Execute in server directory
+        working-directory: ./server
         run: |
           npm install
           npm run build --if-present
-        
+
+      - name: Upload build artifacts for deployment
+        uses: actions/upload-artifact@v3
+        with:
+          name: node-app
+          path: ./server/dist  # Upload only the build output directory
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: none
+
+    steps:
+      - name: Download artifact from build job
+        uses: actions/download-artifact@v3
+        with:
+          name: node-app
+
+      - name: List files to verify artifact contents
+        run: |
+          echo "Listing root directory:"
+          ls -la
+          echo "Listing dist directory:"
+          ls -la ./dist
+
       - name: 'Deploy to Azure WebApp'
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v2
