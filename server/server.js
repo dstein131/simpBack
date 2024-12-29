@@ -46,24 +46,24 @@ const io = socket.init(server);
 
 // Handle Socket.IO connections
 io.on('connection', (socket) => {
-  console.log('✅ User connected:', socket.id);
+  logger.info('✅ User connected:', socket.id);
 
   // Join a specific streamer room
   socket.on('join-streamer-room', (roomId) => {
     socket.join(roomId);
-    console.log(`User ${socket.id} joined room: ${roomId}`);
+    logger.info(`User ${socket.id} joined room: ${roomId}`);
   });
 
   // Handle sending tips
   socket.on('send-tip', (data) => {
     const { streamerId, tipAmount, message } = data;
     io.to(streamerId).emit('receive-tip', { tipAmount, message });
-    console.log(`Tip sent to streamer ${streamerId}: $${tipAmount}`);
+    logger.info(`Tip sent to streamer ${streamerId}: $${tipAmount}`);
   });
 
   // Handle disconnections
   socket.on('disconnect', () => {
-    console.log('❌ User disconnected:', socket.id);
+    logger.info('❌ User disconnected:', socket.id);
   });
 });
 
@@ -87,7 +87,7 @@ const startWorker = () => {
   const worker = fork(workerPath);
 
   // Log messages from the worker
-  worker.on('message', (msg) => console.log('[Worker Message]:', msg));
+  worker.on('message', (msg) => logger.info('[Worker Message]:', msg));
 
   // Handle worker errors
   worker.on('error', (err) => console.error('[Worker Error]:', err));
@@ -95,7 +95,7 @@ const startWorker = () => {
   // Restart worker if it exits unexpectedly
   worker.on('exit', (code) => {
     console.error(`[Worker] exited with code ${code}`);
-    console.log('[Worker] Restarting...');
+    logger.info('[Worker] Restarting...');
     startWorker();
   });
 };
@@ -136,7 +136,7 @@ ttsQueue.on('completed', async (job, result) => {
       audioUrl,
     });
 
-    console.log(`✅ TTS Request ${job.id} completed for TTS Request ID ${ttsRequestId}`);
+    logger.info(`✅ TTS Request ${job.id} completed for TTS Request ID ${ttsRequestId}`);
   } catch (err) {
     console.error('❌ Error handling completed TTS job:', err);
   }
