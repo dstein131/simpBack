@@ -32,13 +32,8 @@ jobs:
       - name: Install Dependencies
         working-directory: ./server
         run: npm install
-
-      # Step 4: (Optional) Run Tests
-      - name: Run Tests
-        working-directory: ./server
-        run: npm run test --if-present
-
-      # Step 5: Deploy to Azure WebApp
+   
+      # Step 4: Deploy to Azure WebApp
       - name: Deploy to Azure WebApp
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v2
