@@ -46,14 +46,17 @@ jobs:
 
             # 5a. Add GitHub's SSH host key to known_hosts to prevent host verification errors
             mkdir -p ~/.ssh
+            chmod 700 ~/.ssh
             ssh-keyscan github.com >> ~/.ssh/known_hosts
+            chmod 644 ~/.ssh/known_hosts
 
             # 5b. Transfer the GitHub deploy key to EC2
             echo "${{ secrets.EC2_GITHUB_DEPLOY_KEY }}" > ~/.ssh/github_deploy_key
             chmod 600 ~/.ssh/github_deploy_key
 
             # 5c. Configure SSH to use the deploy key for GitHub
-            echo -e "Host github.com\n  HostName github.com\n  User git\n  IdentityFile ~/.ssh/github_deploy_key\n" >> ~/.ssh/config
+            echo -e "Host github.com\n  HostName github.com\n  User git\n  IdentityFile ~/.ssh/github_deploy_key\n" > ~/.ssh/config
+            chmod 600 ~/.ssh/config
 
             # 5d. Clone the repository if it doesn't exist
             if [ ! -d "/home/ec2-user/simpBack" ]; then
