@@ -20,12 +20,11 @@ jobs:
         with:
           node-version: 18
 
-      # 3. Install dependencies and build the application (if needed)
-      - name: Install and Build Application
+      # 3. Install dependencies
+      - name: Install Dependencies
         run: |
           cd server
           npm install
-          npm run build  # Remove this line if 'build' script is not needed
 
       # 4. Deploy to EC2 via SSH
       - name: Deploy to EC2
@@ -45,9 +44,6 @@ jobs:
 
             # Install dependencies
             npm install
-
-            # Build the application (if applicable)
-            npm run build  # Remove this line if not needed
 
             # Restart the application using PM2
             pm2 stop express-app || true
