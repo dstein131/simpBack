@@ -26,8 +26,8 @@ jobs:
           cd server
           npm install
 
-      # 4. Set up SSH Agent with the deploy key
-      - name: Setup SSH Agent
+      # 4. Set up SSH Agent with the deploy key for EC2 access
+      - name: Setup SSH Agent for EC2
         uses: webfactory/ssh-agent@v0.5.4
         with:
           ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
@@ -41,25 +41,35 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           script: |
-            # Add GitHub's SSH host key to known_hosts to prevent host verification errors
+            #!/bin/bash
+            set -e
+
+            # 5a. Add GitHub's SSH host key to known_hosts to prevent host verification errors
             mkdir -p ~/.ssh
             ssh-keyscan github.com >> ~/.ssh/known_hosts
-            
-            # Clone the repository if it doesn't exist
+
+            # 5b. Transfer the GitHub deploy key to EC2
+            echo "${{ secrets.EC2_GITHUB_DEPLOY_KEY }}" > ~/.ssh/github_deploy_key
+            chmod 600 ~/.ssh/github_deploy_key
+
+            # 5c. Configure SSH to use the deploy key for GitHub
+            echo -e "Host github.com\n  HostName github.com\n  User git\n  IdentityFile ~/.ssh/github_deploy_key\n" >> ~/.ssh/config
+
+            # 5d. Clone the repository if it doesn't exist
             if [ ! -d "/home/ec2-user/simpBack" ]; then
               git clone git@github.com:dstein131/simpBack.git /home/ec2-user/simpBack
             fi
 
-            # Navigate to the server directory
+            # 5e. Navigate to the server directory
             cd /home/ec2-user/simpBack/server
 
-            # Pull the latest changes
+            # 5f. Pull the latest changes
             git pull origin main
 
-            # Install dependencies
+            # 5g. Install dependencies
             npm install
 
-            # Start or restart the application with PM2
+            # 5h. Start or restart the application with PM2
             pm2 stop express-app || true
             pm2 start server.js --name "express-app"
             pm2 save
@@ -69,4 +79,3 @@ jobs:
           proxy_port: 22
           proxy_protocol: tcp
           proxy_timeout: 30s
-
