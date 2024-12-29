@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: 18
 
-      # 3. Install dependencies (Optional: If you need to build or test before deployment)
+      # 3. Install dependencies
       - name: Install Dependencies
         run: |
           cd server
@@ -41,17 +41,21 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           script: |
-            # Navigate to the app directory or clone if not present
+            # Clone the repository if it doesn't exist
             if [ ! -d "/home/ec2-user/simpBack" ]; then
-              git clone https://github.com/dstein131/simpBack.git /home/ec2-user/simpBack
+              git clone git@github.com:dstein131/simpBack.git /home/ec2-user/simpBack
             fi
+
+            # Navigate to the server directory
             cd /home/ec2-user/simpBack/server
+
+            # Pull the latest changes
             git pull origin main
 
             # Install dependencies
             npm install
 
-            # Restart the application using PM2
+            # Start or restart the application with PM2
             pm2 stop express-app || true
-            pm2 start /home/ec2-user/simpBack/server/server.js --name "express-app"
+            pm2 start server.js --name "express-app"
             pm2 save
