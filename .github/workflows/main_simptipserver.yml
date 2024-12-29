@@ -3,49 +3,43 @@ name: Deploy to EC2
 on:
   push:
     branches:
-      - main  # Trigger deployment on push to the main branch
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout the repository
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # 2. Set up Node.js
       - name: Set Up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: '18'
 
-      # 3. Install dependencies
       - name: Install Dependencies
         run: |
           cd server
           npm install
 
-      # 4. Deploy to EC2 via SSH
-      - name: Deploy to EC2
-        uses: appleboy/ssh-action@v0.1.7
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.5.4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          script: |
-            # Navigate to the app directory or clone if not present
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+      - name: Deploy via SSH
+        run: |
+          ssh -o StrictHostKeyChecking=no ec2-user@${{ secrets.EC2_HOST }} << 'EOF'
             if [ ! -d "/home/ec2-user/simpBack/server" ]; then
               git clone https://github.com/dstein131/simpBack.git /home/ec2-user/simpBack
             fi
             cd /home/ec2-user/simpBack/server
             git pull origin main
 
-            # Install dependencies
             npm install
 
-            # Restart the application using PM2
             pm2 stop express-app || true
             pm2 start server.js --name "express-app"
             pm2 save
+          EOF
