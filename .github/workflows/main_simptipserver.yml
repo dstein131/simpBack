@@ -41,6 +41,10 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           script: |
+            # Add GitHub's SSH host key to known_hosts to prevent host verification errors
+            mkdir -p ~/.ssh
+            ssh-keyscan github.com >> ~/.ssh/known_hosts
+            
             # Clone the repository if it doesn't exist
             if [ ! -d "/home/ec2-user/simpBack" ]; then
               git clone git@github.com:dstein131/simpBack.git /home/ec2-user/simpBack
@@ -59,3 +63,10 @@ jobs:
             pm2 stop express-app || true
             pm2 start server.js --name "express-app"
             pm2 save
+          protocol: tcp
+          timeout: 30s
+          command_timeout: 10m
+          proxy_port: 22
+          proxy_protocol: tcp
+          proxy_timeout: 30s
+
