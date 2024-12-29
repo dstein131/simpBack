@@ -1,11 +1,13 @@
+name: Build and Deploy
+
 on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
 
 env:
-  AZURE_WEBAPP_NAME: simptipserver           # Your Azure WebApp name
-  AZURE_WEBAPP_PACKAGE_PATH: './server/dist'  # Path to build output
+  AZURE_WEBAPP_NAME: simptipserver            # Your Azure WebApp name
+  AZURE_WEBAPP_PACKAGE_PATH: './server'      # Path to your server directory
   NODE_VERSION: '18.x'                        # Node.js version
 
 permissions:
@@ -15,8 +17,10 @@ jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
     steps:
+      # Step 1: Checkout the repository
       - uses: actions/checkout@v4
 
+      # Step 2: Set up Node.js environment
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -24,21 +28,21 @@ jobs:
           cache: 'npm'
           cache-dependency-path: './server/package-lock.json'
 
-      - name: npm install, build, and test
+      # Step 3: Install dependencies
+      - name: Install Dependencies
         working-directory: ./server
-        run: |
-          npm install
-          npm run build --if-present
+        run: npm install
 
-      - name: List build directory contents
-        run: |
-          echo "Contents of ./server/dist:"
-          ls -la ./server/dist
+      # Step 4: (Optional) Run Tests
+      - name: Run Tests
+        working-directory: ./server
+        run: npm run test --if-present
 
-      - name: 'Deploy to Azure WebApp'
+      # Step 5: Deploy to Azure WebApp
+      - name: Deploy to Azure WebApp
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v2
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: ./server/dist
+          package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
