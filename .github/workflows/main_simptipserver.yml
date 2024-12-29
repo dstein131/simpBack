@@ -1,97 +1,50 @@
-name: Build and deploy Node.js app to Azure Web App - simptipserver
+name: Deploy to EC2
 
 on:
   push:
     branches:
-      - main
-  workflow_dispatch:
+      - main  # Trigger deployment on push to the main branch
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout the repository
-      - name: Checkout code
-        uses: actions/checkout@v3
+    # Checkout the repository
+    - name: Checkout Code
+      uses: actions/checkout@v3
 
-      # Step 2: Set up Node.js environment
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18.x'
+    # Install Node.js for building locally if needed
+    - name: Set Up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18
 
-      # Step 3: Install dependencies and build the project
-      - name: Install dependencies and build
-        run: |
-          cd server
-          npm ci
-          npm run build --if-present
+    # Build the application (optional if your app requires a build step)
+    - name: Build Application
+      run: |
+        npm install
+        npm run build
 
-      # Step 4: Verify Installation of express
-      - name: Verify express Installation
-        run: |
-          cd server
-          if [ -d "node_modules/express" ]; then
-            echo "✅ express is installed."
-          else
-            echo "❌ express is NOT installed."
-            exit 1
+    # Deploy to EC2 via SSH
+    - name: Deploy to EC2
+      uses: appleboy/ssh-action@v0.1.7
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ec2-user
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          # Navigate to the app directory or clone if not present
+          if [ ! -d "/home/ec2-user/your-repository" ]; then
+            git clone https://github.com/your-username/your-repository.git /home/ec2-user/your-repository
           fi
+          cd /home/ec2-user/your-repository
+          git pull origin main
 
-      # Step 5: Zip the source code (including node_modules)
-      - name: Zip artifact for deployment
-        run: |
-          cd server
-          zip -r ../release.zip ./* -x "logs/*" "*.git*" "*.github*" "README.md"
+          # Install dependencies
+          npm install
 
-      # Step 6: Deploy the zipped artifact to Azure Web App
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v2
-        with:
-          app-name: 'simptipserver'
-          slot-name: 'production'
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: ./release.zip
-
-      # Step 6.1: Force dependency installation on Azure
-      - name: Post Deployment - Install Dependencies
-        env:
-          PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        run: |
-          USERNAME=$(echo "$PUBLISH_PROFILE" | grep -oP '(?<=userName=")[^"]+')
-          PASSWORD=$(echo "$PUBLISH_PROFILE" | grep -oP '(?<=userPWD=")[^"]+')
-          HOST=$(echo "$PUBLISH_PROFILE" | grep -oP '<publishProfile[^>]*publishMethod="MSDeploy"[^>]*publishUrl="\K[^"]+' | sed 's/:443$//')
-          KUDU_API_URL="https://${HOST}/api/command"
-          curl -u "$USERNAME:$PASSWORD" -X POST -d '{"command":"cd /home/site/wwwroot && npm install"}' -H "Content-Type: application/json" "$KUDU_API_URL"
-
-      # Step 7: Prepare the Worker WebJob package
-      - name: Prepare Worker WebJob
-        run: |
-          cd server
-          mkdir worker_deploy
-          cp workers/ttsWorker.js worker_deploy/
-          cp package.json worker_deploy/
-          cd worker_deploy
-          npm install --omit=dev
-          zip -r ../../ttsWorker.zip ./*
-          if [ ! -f ../../ttsWorker.zip ]; then
-            echo "Error: ttsWorker.zip was not created."
-            exit 1
-          fi
-
-      # Step 8: Deploy the Worker WebJob to Azure
-      - name: Deploy Worker as WebJob
-        env:
-          PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        run: |
-          USERNAME=$(echo "$PUBLISH_PROFILE" | grep -oP '(?<=userName=")[^"]+')
-          PASSWORD=$(echo "$PUBLISH_PROFILE" | grep -oP '(?<=userPWD=")[^"]+')
-          HOST=$(echo "$PUBLISH_PROFILE" | grep -oP '<publishProfile[^>]*publishMethod="MSDeploy"[^>]*publishUrl="\K[^"]+' | sed 's/:443$//')
-          KUDU_API_URL="https://${HOST}/api/continuouswebjobs/ttsWorker/upload"
-          curl -X POST -u "$USERNAME:$PASSWORD" -F "file=@ttsWorker.zip" "$KUDU_API_URL"
-
-      # Step 9: Clean up the zipped artifacts
-      - name: Clean Up
-        run: |
-          rm release.zip ttsWorker.zip
+          # Restart the application using PM2
+          pm2 stop all || true
+          pm2 start server.js --name "express-app"
+          pm2 save
