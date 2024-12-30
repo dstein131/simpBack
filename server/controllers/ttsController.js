@@ -251,6 +251,58 @@ const getTTSRequests = async (req, res) => {
   }
 };
 
+/**
+ * Get TTS Requests by Creator
+ * GET /api/tts/creator/:creatorId
+ */
+const getTTSRequestsByCreator = async (req, res) => {
+  try {
+    const { creatorId } = req.params;
+
+    console.log(`Fetching TTS requests for Creator ID: ${creatorId}`);
+
+    // Validate creatorId
+    if (!creatorId) {
+      return res.status(400).json({ error: 'Creator ID is required.' });
+    }
+
+    // Optional: Validate the creator exists
+    const [creatorExists] = await db.query('SELECT id FROM creators WHERE id = ?', [creatorId]);
+    if (creatorExists.length === 0) {
+      return res.status(404).json({ error: 'Creator not found.' });
+    }
+
+    // Fetch TTS requests associated with the creator
+    const [ttsRequests] = await db.query(
+      `SELECT 
+         tr.id AS ttsRequestId, 
+         tr.user_id AS userId, 
+         tr.status, 
+         tr.processed_at, 
+         tr.audio_url AS audioUrl, 
+         tr.voice,
+         u.username AS userName
+       FROM tts_requests tr
+       JOIN users u ON tr.user_id = u.id
+       WHERE tr.creator_id = ?
+       ORDER BY tr.created_at DESC`,
+      [creatorId]
+    );
+
+    // Optionally, you can implement pagination
+    // const page = parseInt(req.query.page) || 1;
+    // const limit = parseInt(req.query.limit) || 20;
+    // const offset = (page - 1) * limit;
+    // Modify the query above to include LIMIT and OFFSET
+
+    res.status(200).json({ ttsRequests });
+  } catch (error) {
+    logger.error('❌ Error in getTTSRequestsByCreator:', error);
+    res.status(500).json({ error: 'Failed to fetch TTS requests for the creator.' });
+  }
+};
+
+
 
 // Export controller functions
 module.exports = {
@@ -259,4 +311,5 @@ module.exports = {
   updateTTSRequestStatus,
   getAvailableVoices: getAvailableVoicesController,
   downloadTTSAudio,
+  getTTSRequestsByCreator,
 };
