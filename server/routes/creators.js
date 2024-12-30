@@ -7,7 +7,7 @@ const {
   updateCreator,
   deleteCreator,
 } = require('../controllers/creatorController'); // Import creator controller
-const { authenticateToken } = require('../middlewares/auth'); // Authentication middleware
+const { authenticateToken } = require('../middlewares/auth.js'); // Import authenticateToken middleware
 
 // Routes for creators
 router.get('/', authenticateToken, getCreators); // GET all creators
