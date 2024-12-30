@@ -38,23 +38,29 @@ const logger = createLogger({
     ...(!isProduction ? [
       new transports.File({ filename: path.join(logDir, 'debug.log'), level: 'debug' }),
     ] : []),
+    
+    // Always log to console for Azure Log Streams
+    new transports.Console({
+      level: logLevel, // Match the general log level
+      format: isProduction
+        ? format.combine(
+            format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+            format.errors({ stack: true }),
+            format.splat(),
+            format.json()
+          )
+        : format.combine(
+            format.colorize(),
+            format.printf(({ timestamp, level, message, stack }) => {
+              return stack
+                ? `[${timestamp}] ${level}: ${message} - ${stack}`
+                : `[${timestamp}] ${level}: ${message}`;
+            })
+          ),
+    }),
   ],
+  exitOnError: false, // Do not exit on handled exceptions
 });
-
-// If we're not in production, also log to the `console` with detailed format
-if (!isProduction) {
-  logger.add(new transports.Console({
-    level: 'debug', // Ensure console captures debug logs
-    format: format.combine(
-      format.colorize(),
-      format.printf(({ timestamp, level, message, stack }) => {
-        return stack
-          ? `[${timestamp}] ${level}: ${message} - ${stack}`
-          : `[${timestamp}] ${level}: ${message}`;
-      })
-    ),
-  }));
-}
 
 // Handle uncaught exceptions and unhandled rejections
 logger.exceptions.handle(
