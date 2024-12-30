@@ -21,21 +21,24 @@ exports.registerUser = async (req, res) => {
     // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Use 'tipper' as the default role if not provided
+    const userRole = role || 'tipper';
+
     // Insert the new user
     await db.query('INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)', [
       username,
       email,
       hashedPassword,
-      role,
+      userRole,
     ]);
 
     // Generate a JWT token
-    const token = jwt.sign({ email, username, role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ email, username, role: userRole }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
     res.status(201).json({
       message: 'User registered successfully!',
       token,
-      user: { username, email, role },
+      user: { username, email, role: userRole },
     });
   } catch (error) {
     console.error('❌ Error in Register Controller - registerUser:', error);
