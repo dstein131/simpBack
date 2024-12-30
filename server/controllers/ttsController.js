@@ -319,12 +319,45 @@ const getTTSRequestsByCreator = async (req, res) => {
       [creatorId, parsedLimit, offset]
     );
 
+    // Fetch audio files for completed TTS requests
+    const enrichedRequests = await Promise.all(
+      ttsRequests.map(async (request) => {
+        if (request.status === 'completed' && request.audioUrl) {
+          try {
+            const s3Url = new URL(request.audioUrl);
+            const bucketName = s3Url.host.split('.')[0]; // Extract bucket name from URL host
+            const key = decodeURIComponent(s3Url.pathname.slice(1)); // Remove leading slash and decode
+
+            console.log(`Fetching audio file from S3 bucket: ${bucketName}, key: ${key}`);
+
+            const command = new GetObjectCommand({
+              Bucket: bucketName,
+              Key: key,
+            });
+
+            const audioStream = await s3Client.send(command);
+
+            // Optionally, you can return a signed URL or pass the audio stream
+            // For simplicity, keep the audioUrl as is
+            return {
+              ...request,
+              audioUrl: request.audioUrl,
+            };
+          } catch (error) {
+            console.error('Error fetching audio from S3:', error);
+            return request;
+          }
+        }
+        return request;
+      })
+    );
+
     res.status(200).json({
       page: parsedPage,
       limit: parsedLimit,
       total,
       totalPages,
-      ttsRequests,
+      ttsRequests: enrichedRequests,
     });
   } catch (error) {
     console.error('❌ Error in getTTSRequestsByCreator:', error);
@@ -332,9 +365,6 @@ const getTTSRequestsByCreator = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch TTS requests for the creator.' });
   }
 };
-
-
-
 
 
 // Export controller functions
