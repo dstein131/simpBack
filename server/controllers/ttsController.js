@@ -326,18 +326,20 @@ const getTTSRequestsByCreator = async (req, res) => {
     const userRole = requestingUser.role;
     const userCreatorId = requestingUser.creatorId;
 
-    console.log(`User ID: ${userId}, Role: ${userRole} is accessing Creator ID: ${creatorId}`);
+    logger.info(`User ID: ${userId}, Role: ${userRole} is accessing Creator ID: ${creatorId}`);
 
     // Validate creatorId
     if (!creatorId) {
+      logger.warn(`Creator ID not provided in request by User ID: ${userId}`);
       return res.status(400).json({ error: 'Creator ID is required.' });
     }
 
     // If the user is not an admin, ensure they are accessing their own creatorId
     if (userRole !== 'admin') {
+      logger.info(`User's Creator ID: ${userCreatorId}, Requested Creator ID: ${creatorId}`);
       if (userCreatorId !== parseInt(creatorId, 10)) {
         logger.warn(
-          `User ${userId} with role ${userRole} attempted to access Creator ID ${creatorId}`
+          `User ${userId} with role ${userRole} attempted to access Creator ID ${creatorId}, which does not match their own Creator ID ${userCreatorId}`
         );
         return res
           .status(403)
