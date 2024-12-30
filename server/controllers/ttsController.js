@@ -19,11 +19,15 @@ const s3Client = new S3Client({
  * Submit a TTS Request
  * POST /api/tts
  */
+/**
+ * Submit a TTS Request
+ * POST /api/tts
+ */
 const submitTTSRequest = async (req, res) => {
   try {
-    const { message, voice, userId } = req.body;
+    const { message, voice, userId, creatorId } = req.body;
 
-    console.log('Received Request:', { message, voice, userId });
+    console.log('Received Request:', { message, voice, userId, creatorId });
 
     if (!userId) {
       return res.status(400).json({ error: 'User ID is required.' });
@@ -37,6 +41,10 @@ const submitTTSRequest = async (req, res) => {
       return res.status(400).json({ error: 'Voice selection is required.' });
     }
 
+    if (!creatorId) {
+      return res.status(400).json({ error: 'Creator ID is required.' });
+    }
+
     // Validate the user ID exists in the database
     const [userExists] = await db.query('SELECT id FROM users WHERE id = ?', [userId]);
 
@@ -44,10 +52,17 @@ const submitTTSRequest = async (req, res) => {
       return res.status(400).json({ error: 'Invalid user ID.' });
     }
 
+    // Validate the creator ID exists in the database
+    const [creatorExists] = await db.query('SELECT id FROM creators WHERE id = ?', [creatorId]);
+
+    if (creatorExists.length === 0) {
+      return res.status(400).json({ error: 'Invalid creator ID.' });
+    }
+
     // Insert the TTS request into the database
     const [result] = await db.query(
-      'INSERT INTO tts_requests (user_id, status, voice) VALUES (?, ?, ?)',
-      [userId, 'pending', voice]
+      'INSERT INTO tts_requests (user_id, creator_id, status, voice) VALUES (?, ?, ?, ?)',
+      [userId, creatorId, 'pending', voice]
     );
 
     const ttsRequestId = result.insertId;
@@ -82,6 +97,7 @@ const submitTTSRequest = async (req, res) => {
     res.status(500).json({ error: 'Failed to submit TTS request.' });
   }
 };
+
 
 /**
  * Download TTS Audio
