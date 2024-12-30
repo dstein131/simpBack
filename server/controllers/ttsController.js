@@ -321,8 +321,8 @@ const getTTSRequests = async (req, res) => {
  */
 const getTTSRequestsByCreator = async (req, res) => {
   try {
-    const { creatorId } = req.params;
-    const { userId, role, page = 1, limit = 50 } = req.query;
+ 
+    const { userId, creatorId, role, page = 1, limit = 50 } = req.query;
 
     logger.info(`User ID: ${userId}, Role: ${role}, Creator ID: ${creatorId} requested TTS data`);
 
