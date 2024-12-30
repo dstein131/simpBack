@@ -25,19 +25,31 @@ exports.loginUser = async (req, res) => {
       return res.status(400).json({ error: 'Invalid credentials.' });
     }
 
+    // Check if the user is a creator
+    let creatorInfo = null;
+    if (user[0].is_creator) {
+      const [creator] = await db.query(
+        'SELECT * FROM creators WHERE user_id = ?',
+        [user[0].id]
+      );
+      creatorInfo = creator.length > 0 ? creator[0] : null;
+    }
+
     // Generate a JWT token
     const token = jwt.sign(
       { userId: user[0].id, email: user[0].email, role: user[0].role },
       process.env.ACCESS_TOKEN_SECRET,
       { expiresIn: '1h' }
     );
-    
 
     // Prepare response data
     const responseData = {
       message: 'Logged in successfully!',
       token,
-      user: user[0], // Send full user object
+      user: {
+        ...user[0],
+        creatorId: creatorInfo ? creatorInfo.id : null,
+      },
     };
 
     // Log the response data
