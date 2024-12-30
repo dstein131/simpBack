@@ -286,21 +286,7 @@ const getTTSRequestsByCreator = async (req, res) => {
 
     logger.info(`User ID: ${userId}, Role: ${role}, Creator ID: ${creatorId} requested TTS data`);
 
-    // Validate required parameters
-    if (!creatorId) {
-      logger.warn(`Creator ID not provided in request`);
-      return res.status(400).json({ error: 'Creator ID is required.' });
-    }
-
-    // Check if the user's creatorId matches the requested creatorId
-    if (parseInt(req.user.creatorId, 10) !== parseInt(creatorId, 10)) {
-      logger.warn(
-        `User's Creator ID ${req.user.creatorId} does not match requested Creator ID ${creatorId}`
-      );
-      return res.status(403).json({ error: 'Forbidden: You do not have access to these resources.' });
-    }
-
-    // Pagination
+       // Pagination
     const parsedPage = parseInt(page, 10) || 1;
     const parsedLimit = parseInt(limit, 10) || 50;
     const offset = (parsedPage - 1) * parsedLimit;
