@@ -25,7 +25,7 @@ const logger = createLogger({
     }),
     format.errors({ stack: true }), // Include stack trace in logs
     format.splat(),
-    format.json() // Log in JSON format
+    format.json() // Log in JSON format for structured logging
   ),
   transports: [
     // Write all logs with level `error` and below to `error.log`
@@ -39,7 +39,7 @@ const logger = createLogger({
       new transports.File({ filename: path.join(logDir, 'debug.log'), level: 'debug' }),
     ] : []),
     
-    // Always log to console for Azure Log Streams
+    // **Always** log to console for Azure Log Streams
     new transports.Console({
       level: logLevel, // Match the general log level
       format: isProduction
