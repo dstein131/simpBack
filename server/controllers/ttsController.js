@@ -1,10 +1,12 @@
+// controllers/ttsController.js
+
 const db = require('../db'); // Import the database connection
-const logger = require('../logger'); // For error handling
+const logger = require('../logger'); // For logging
 const ttsQueue = require('../queues/ttsQueue');
 const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
 const path = require('path');
 const fs = require('fs');
-const util = require('util'); // Add this import
+const util = require('util'); // For promisifying functions
 
 // Initialize AWS S3 Client
 const s3Client = new S3Client({
@@ -19,20 +21,15 @@ const s3Client = new S3Client({
  * Submit a TTS Request
  * POST /api/tts
  */
-/**
- * Submit a TTS Request
- * POST /api/tts
- */
 const submitTTSRequest = async (req, res) => {
   try {
-    const { message, voice, userId, creatorId } = req.body;
+    const { message, voice, creatorId } = req.body;
+    const userId = req.user.id; // Derived from authentication middleware
+    const userRole = req.user.role; // 'admin', 'creator', etc.
 
-    console.log('Received Request:', { message, voice, userId, creatorId });
+    console.log('Received TTS Request:', { message, voice, userId, creatorId });
 
-    if (!userId) {
-      return res.status(400).json({ error: 'User ID is required.' });
-    }
-
+    // Validate required fields
     if (!message) {
       return res.status(400).json({ error: 'Message is required.' });
     }
@@ -45,11 +42,12 @@ const submitTTSRequest = async (req, res) => {
       return res.status(400).json({ error: 'Creator ID is required.' });
     }
 
-    // Validate the user ID exists in the database
-    const [userExists] = await db.query('SELECT id FROM users WHERE id = ?', [userId]);
-
-    if (userExists.length === 0) {
-      return res.status(400).json({ error: 'Invalid user ID.' });
+    // If the user is not an admin, ensure they are submitting for their own creatorId
+    if (userRole !== 'admin') {
+      if (req.user.creatorId !== parseInt(creatorId, 10)) {
+        logger.warn(`User ${userId} with role ${userRole} attempted to submit TTS request for Creator ID ${creatorId}`);
+        return res.status(403).json({ error: 'Forbidden: You cannot submit TTS requests for this creator.' });
+      }
     }
 
     // Validate the creator ID exists in the database
@@ -59,16 +57,16 @@ const submitTTSRequest = async (req, res) => {
       return res.status(400).json({ error: 'Invalid creator ID.' });
     }
 
-    // Insert the TTS request into the database
+    // Insert the TTS request into the database with status 'pending'
     const [result] = await db.query(
-      'INSERT INTO tts_requests (user_id, creator_id, status, voice) VALUES (?, ?, ?, ?)',
-      [userId, creatorId, 'pending', voice]
+      'INSERT INTO tts_requests (user_id, creator_id, status, voice, message) VALUES (?, ?, ?, ?, ?)',
+      [userId, creatorId, 'pending', voice, message]
     );
 
     const ttsRequestId = result.insertId;
     console.log('TTS Request Created with ID:', ttsRequestId);
 
-    // Ensure the status is updated to 'processing' after insertion
+    // Update the status to 'processing'
     await db.query('UPDATE tts_requests SET status = "processing" WHERE id = ?', [ttsRequestId]);
 
     // Enqueue the TTS processing job
@@ -94,10 +92,10 @@ const submitTTSRequest = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error in submitTTSRequest:', error);
+    logger.error('❌ Error in submitTTSRequest:', error);
     res.status(500).json({ error: 'Failed to submit TTS request.' });
   }
 };
-
 
 /**
  * Download TTS Audio
@@ -106,26 +104,30 @@ const submitTTSRequest = async (req, res) => {
 const downloadTTSAudio = async (req, res) => {
   try {
     const { id } = req.params; // TTS request ID
-    const userId = req.query.userId; // User ID from query parameters
+    const userId = req.user.id; // Derived from authentication middleware
+    const userRole = req.user.role; // 'admin', 'creator', etc.
+    const userCreatorId = req.user.creatorId;
 
-    console.log(`Requesting download for TTS request ID: ${id}, User ID: ${userId}`);
-
-    // Validate userId
-    if (!userId) {
-      return res.status(400).json({ error: 'User ID is required.' });
-    }
+    console.log(`User ID: ${userId} is requesting download for TTS Request ID: ${id}`);
 
     // Fetch TTS request details from the database
     const [ttsRequests] = await db.query(
-      'SELECT audio_url, status FROM tts_requests WHERE id = ? AND user_id = ?',
-      [id, userId]
+      'SELECT audio_url, status, creator_id FROM tts_requests WHERE id = ?',
+      [id]
     );
 
     if (ttsRequests.length === 0) {
-      return res.status(404).json({ error: 'TTS request not found or not associated with this user.' });
+      return res.status(404).json({ error: 'TTS request not found.' });
     }
 
-    const { audio_url: audioUrl, status } = ttsRequests[0];
+    const { audio_url: audioUrl, status, creator_id: creatorId } = ttsRequests[0];
+
+    // Authorization Check:
+    // Allow if user is admin or user owns the creator_id associated with the TTS request
+    if (userRole !== 'admin' && userCreatorId !== creatorId) {
+      logger.warn(`User ${userId} with role ${userRole} attempted to download TTS Request ID ${id} for Creator ID ${creatorId}`);
+      return res.status(403).json({ error: 'Forbidden: You do not have access to this TTS audio.' });
+    }
 
     // Ensure TTS processing is completed
     if (status !== 'completed') {
@@ -154,19 +156,22 @@ const downloadTTSAudio = async (req, res) => {
     // Stream the S3 file to the client
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Content-Disposition', `attachment; filename="audio-${id}.mp3"`);
+
+    // Pipe the S3 response stream to the HTTP response
     response.Body.pipe(res);
+
+    response.Body.on('error', (err) => {
+      console.error('❌ Error streaming audio from S3:', err);
+      res.status(500).json({ error: 'Failed to stream audio file.' });
+    });
 
     console.log(`Audio file for TTS request ID ${id} served successfully.`);
   } catch (error) {
     console.error('❌ Error in downloadTTSAudio:', error);
+    logger.error('❌ Error in downloadTTSAudio:', error);
     res.status(500).json({ error: 'Failed to download TTS audio.' });
   }
 };
-
-
-
-
-
 
 /**
  * Get Available Voices
@@ -182,12 +187,11 @@ const getAvailableVoicesController = async (req, res) => {
     ];
     res.status(200).json({ voices });
   } catch (error) {
+    console.error('❌ Error in getAvailableVoicesController:', error);
     logger.error('❌ Error in getAvailableVoicesController:', error);
     res.status(500).json({ error: 'Failed to fetch available voices.' });
   }
 };
-
-
 
 /**
  * Update TTS Request Status
@@ -195,8 +199,12 @@ const getAvailableVoicesController = async (req, res) => {
  */
 const updateTTSRequestStatus = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id } = req.params; // TTS request ID
     const { status, audioUrl } = req.body;
+    const userId = req.user.id; // Derived from authentication middleware
+    const userRole = req.user.role; // 'admin', 'creator', etc.
+
+    console.log(`User ID: ${userId} is updating status for TTS Request ID: ${id} to ${status}`);
 
     // Validate status
     const validStatuses = ['pending', 'processing', 'completed', 'failed'];
@@ -205,10 +213,19 @@ const updateTTSRequestStatus = async (req, res) => {
     }
 
     // Fetch the TTS request to check if it exists
-    const [ttsRequests] = await db.query('SELECT id FROM tts_requests WHERE id = ?', [id]);
+    const [ttsRequests] = await db.query('SELECT id, creator_id FROM tts_requests WHERE id = ?', [id]);
 
     if (ttsRequests.length === 0) {
       return res.status(404).json({ error: 'TTS request not found.' });
+    }
+
+    const { creator_id: creatorId } = ttsRequests[0];
+
+    // Authorization Check:
+    // Allow if user is admin or user owns the creator associated with the TTS request
+    if (userRole !== 'admin' && req.user.creatorId !== creatorId) {
+      logger.warn(`User ${userId} with role ${userRole} attempted to update TTS Request ID ${id} for Creator ID ${creatorId}`);
+      return res.status(403).json({ error: 'Forbidden: You do not have permission to update this TTS request.' });
     }
 
     // Prepare the update query
@@ -225,6 +242,7 @@ const updateTTSRequestStatus = async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Error in updateTTSRequestStatus:', error);
+    logger.error('❌ Error in updateTTSRequestStatus:', error);
     res.status(500).json({ error: 'Failed to update TTS request status.' });
   }
 };
@@ -235,17 +253,50 @@ const updateTTSRequestStatus = async (req, res) => {
  */
 const getTTSRequests = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.id; // Derived from authentication middleware
 
-    // Fetch TTS requests for the logged-in user from the database
-    const [ttsRequests] = await db.query(
-      'SELECT id AS ttsRequestId, status, processed_at, audio_url, voice FROM tts_requests WHERE user_id = ?',
+    console.log(`User ID: ${userId} is fetching their TTS requests.`);
+
+    // Pagination parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    // Fetch total count for pagination
+    const [countResult] = await db.query(
+      'SELECT COUNT(*) AS total FROM tts_requests WHERE user_id = ?',
       [userId]
     );
+    const total = countResult[0].total;
+    const totalPages = Math.ceil(total / limit);
 
-    // Respond with the TTS requests
-    res.status(200).json(ttsRequests);
+    // Fetch TTS requests with pagination
+    const [ttsRequests] = await db.query(
+      `SELECT 
+         tr.id AS ttsRequestId, 
+         tr.status, 
+         tr.processed_at, 
+         tr.audio_url AS audioUrl, 
+         tr.voice,
+         tr.message,
+         c.name AS creatorName
+       FROM tts_requests tr
+       JOIN creators c ON tr.creator_id = c.id
+       WHERE tr.user_id = ?
+       ORDER BY tr.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [userId, limit, offset]
+    );
+
+    res.status(200).json({
+      page,
+      limit,
+      total,
+      totalPages,
+      ttsRequests,
+    });
   } catch (error) {
+    console.error('❌ Error in getTTSRequests:', error);
     logger.error('❌ Error in getTTSRequests:', error);
     res.status(500).json({ error: 'Failed to fetch TTS requests.' });
   }
@@ -258,30 +309,29 @@ const getTTSRequests = async (req, res) => {
 const getTTSRequestsByCreator = async (req, res) => {
   try {
     const { creatorId } = req.params;
-    const requestingUser = req.user; // Assuming `req.user` is populated by your auth middleware
+    const requestingUser = req.user; // Populated by authenticateToken middleware
+    const userId = requestingUser.id;
+    const userRole = requestingUser.role;
+    const userCreatorId = requestingUser.creatorId;
 
-    console.log(`User ${requestingUser.id} is fetching TTS requests for Creator ID: ${creatorId}`);
+    console.log(`User ID: ${userId}, Role: ${userRole} is accessing Creator ID: ${creatorId}`);
 
     // Validate creatorId
     if (!creatorId) {
       return res.status(400).json({ error: 'Creator ID is required.' });
     }
 
-    // Check if the requesting user is the creator or has admin privileges
-    // Assuming `requestingUser.role` exists and 'admin' is a possible role
-    if (requestingUser.role !== 'admin' && requestingUser.id !== parseInt(creatorId, 10)) {
-      return res.status(403).json({ error: 'Forbidden: You do not have access to these resources.' });
-    }
-
-    // Optional: Validate the creator exists
-    const [creatorExists] = await db.query('SELECT id FROM creators WHERE id = ?', [creatorId]);
-    if (creatorExists.length === 0) {
-      return res.status(404).json({ error: 'Creator not found.' });
+    // If the user is not an admin, ensure they are accessing their own creatorId
+    if (userRole !== 'admin') {
+      if (userCreatorId !== parseInt(creatorId, 10)) {
+        logger.warn(`User ${userId} with role ${userRole} attempted to access Creator ID ${creatorId}`);
+        return res.status(403).json({ error: 'Forbidden: You do not have access to these resources.' });
+      }
     }
 
     // Pagination parameters
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
+    const limit = parseInt(req.query.limit) || 50;
     const offset = (page - 1) * limit;
 
     // Fetch total count for pagination
@@ -297,7 +347,7 @@ const getTTSRequestsByCreator = async (req, res) => {
       `SELECT 
          tr.id AS ttsRequestId, 
          tr.user_id AS userId, 
-         tr.message,        -- Added message field
+         tr.message,        -- Included message field
          tr.status, 
          tr.processed_at, 
          tr.audio_url AS audioUrl, 
@@ -319,20 +369,18 @@ const getTTSRequestsByCreator = async (req, res) => {
       ttsRequests,
     });
   } catch (error) {
+    console.error('❌ Error in getTTSRequestsByCreator:', error);
     logger.error('❌ Error in getTTSRequestsByCreator:', error);
     res.status(500).json({ error: 'Failed to fetch TTS requests for the creator.' });
   }
 };
 
-
-
-
 // Export controller functions
 module.exports = {
   submitTTSRequest,
-  getTTSRequests,
-  updateTTSRequestStatus,
-  getAvailableVoices: getAvailableVoicesController,
   downloadTTSAudio,
+  getAvailableVoices: getAvailableVoicesController,
+  updateTTSRequestStatus,
+  getTTSRequests,
   getTTSRequestsByCreator,
 };
