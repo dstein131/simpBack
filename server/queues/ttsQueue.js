@@ -1,52 +1,45 @@
 const Bull = require('bull');
 const { processTTSRequest } = require('../services/ttsService');
 const logger = require('../logger');
-const db = require('../db');  // <-- Import db module
+const db = require('../db');
 
-// Initialize the queue
+// Initialize Redis with connection options
 const ttsQueue = new Bull('ttsQueue', {
   redis: {
-    host: process.env.REDIS_HOST || '127.0.0.1',
-    port: process.env.REDIS_PORT || 6379,
-    password: process.env.REDIS_PASSWORD || undefined,
+    host: process.env.REDIS_HOST,
+    port: parseInt(process.env.REDIS_PORT, 10),
+    password: process.env.REDIS_PASSWORD,
+    tls: {}, // Required for secure connections to Azure Redis
+    retryStrategy: (times) => Math.min(times * 50, 2000),
   },
 });
 
-// Define the processing function
+// Define job processing logic
 ttsQueue.process(async (job) => {
   const { ttsRequestId, message, voice, useS3 } = job.data;
 
   try {
-    // Process the TTS request (this will return the audio URL)
     const audioUrl = await processTTSRequest(ttsRequestId, message, voice, useS3);
-    logger.info(`✅ Successfully processed TTS Request ID: ${ttsRequestId}`);
-
-    // After processing, update the status of the TTS request in the database to "completed"
-    const updateQuery = 'UPDATE tts_requests SET status = "completed", audio_url = ? WHERE id = ?';
-    await db.query(updateQuery, [audioUrl, ttsRequestId]); // Updating with the generated audio URL
-
-    logger.info(`✅ Successfully updated TTS Request ID: ${ttsRequestId} status to completed with audio URL`);
-
-    // Return the audio URL as the result of the job
+    logger.info(`✅ TTS Request ${ttsRequestId} processed successfully.`);
+    await db.query(
+      'UPDATE tts_requests SET status = "completed", audio_url = ? WHERE id = ?',
+      [audioUrl, ttsRequestId]
+    );
     return audioUrl;
   } catch (error) {
-    // In case of failure, update the status to "failed" and log the error
-    const updateQuery = 'UPDATE tts_requests SET status = "failed" WHERE id = ?';
-    await db.query(updateQuery, [ttsRequestId]); // Update status to failed
-    logger.error(`❌ Failed to process TTS Request ID: ${ttsRequestId} - ${error.message}`);
-
-    throw error; // Bull will handle retries based on the job options
+    logger.error(`❌ TTS Request ${ttsRequestId} failed: ${error.message}`);
+    await db.query('UPDATE tts_requests SET status = "failed" WHERE id = ?', [ttsRequestId]);
+    throw error;
   }
 });
 
-
-// Optional: Add event listeners for better monitoring
+// Add monitoring for queue events
 ttsQueue.on('completed', (job, result) => {
-  logger.info(`Job completed with result ${result}`);
+  logger.info(`✅ Job completed. ID: ${job.id}, Result: ${result}`);
 });
 
-ttsQueue.on('failed', (job, err) => {
-  logger.error(`Job failed with error ${err.message}`);
+ttsQueue.on('failed', (job, error) => {
+  logger.error(`❌ Job failed. ID: ${job.id}, Error: ${error.message}`);
 });
 
 module.exports = ttsQueue;

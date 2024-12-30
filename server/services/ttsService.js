@@ -2,19 +2,13 @@ const axios = require('axios');
 const db = require('../db');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 const { v4: uuidv4 } = require('uuid');
-const path = require('path');
-const fs = require('fs');
-const logger = require('../logger'); // Ensure you have a logger setup
+const logger = require('../logger');
 
-/*********************************************
- *  LOAD ENVIRONMENT VARIABLES
- ********************************************/
 const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY;
 const ELEVENLABS_API_URL = process.env.ELEVENLABS_API_URL || 'https://api.elevenlabs.io/v1/text-to-speech';
 const AWS_REGION = process.env.AWS_REGION;
 const AWS_S3_BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME;
 
-// Initialize AWS S3 Client
 const s3Client = new S3Client({
   region: AWS_REGION,
   credentials: {
@@ -23,22 +17,11 @@ const s3Client = new S3Client({
   },
 });
 
-/*********************************************
- *  VOICE ID MAPPING
- ********************************************/
-const DEFAULT_VOICE_ID = 'pqHfZKP75CvOlQylNhV4'; // Replace with your preferred default voice ID
-
 const validateAndMapVoice = (voice) => {
-  if (voice.toLowerCase() === 'default') {
-    logger.info(`Mapping 'default' voice to '${DEFAULT_VOICE_ID}'`);
-    return DEFAULT_VOICE_ID;
-  }
-  return voice;
+  const DEFAULT_VOICE_ID = 'pqHfZKP75CvOlQylNhV4'; // Replace as needed
+  return voice.toLowerCase() === 'default' ? DEFAULT_VOICE_ID : voice;
 };
 
-/*********************************************
- *  TTS GENERATION
- ********************************************/
 const generateTTS = async (text, voice) => {
   const validVoice = validateAndMapVoice(voice);
 
@@ -52,41 +35,37 @@ const generateTTS = async (text, voice) => {
           'xi-api-key': ELEVENLABS_API_KEY,
         },
         responseType: 'arraybuffer',
-        timeout: 30000,
+        timeout: 30000, // 30 seconds timeout
       }
     );
     return response.data;
   } catch (error) {
-    const errorMessage = error.response?.data?.detail?.message || 'Failed to generate TTS.';
-    logger.error('❌ Error generating TTS:', errorMessage);
+    const errorMessage = error.response?.data?.detail?.message || error.message || 'Failed to generate TTS';
+    logger.error(`❌ TTS Generation Error: ${errorMessage}`);
     throw new Error(errorMessage);
   }
 };
 
-/*********************************************
- *  AUDIO STORAGE
- ********************************************/
 const saveTTSAudioToS3 = async (ttsRequestId, audioData) => {
+  const uniqueFileName = `${ttsRequestId}-${uuidv4()}.mp3`;
+
   try {
-    const uniqueFileName = `${ttsRequestId}-${uuidv4()}.mp3`;
     const command = new PutObjectCommand({
       Bucket: AWS_S3_BUCKET_NAME,
       Key: `tts_audios/${uniqueFileName}`,
       Body: audioData,
       ContentType: 'audio/mpeg',
     });
-
     await s3Client.send(command);
-    return `https://${AWS_S3_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/tts_audios/${uniqueFileName}`;
+
+    const audioUrl = `https://${AWS_S3_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/tts_audios/${uniqueFileName}`;
+    return audioUrl;
   } catch (error) {
     logger.error(`❌ Error uploading TTS audio to S3: ${error.message}`);
     throw new Error('Failed to upload TTS audio to S3.');
   }
 };
 
-/*********************************************
- *  DATABASE OPERATIONS
- ********************************************/
 const updateTTSRequestInDB = async (ttsRequestId, status, audioUrl = null) => {
   try {
     await db.query(
@@ -94,24 +73,20 @@ const updateTTSRequestInDB = async (ttsRequestId, status, audioUrl = null) => {
       [status, audioUrl, ttsRequestId]
     );
   } catch (error) {
-    logger.error(`❌ Error updating TTS request (ID: ${ttsRequestId}):`, error.message);
+    logger.error(`❌ Error updating TTS request ID: ${ttsRequestId} - ${error.message}`);
     throw new Error('Failed to update TTS request in the database.');
   }
 };
 
-
-/*********************************************
- *  PROCESSING FUNCTION
- ********************************************/
 const processTTSRequest = async (ttsRequestId, message, voice, useS3 = true) => {
   try {
     const audioData = await generateTTS(message, voice);
     const audioUrl = useS3
       ? await saveTTSAudioToS3(ttsRequestId, audioData)
-      : `/tts_audios/${ttsRequestId}-${uuidv4()}.mp3`; // Adjust for local storage
+      : `/tts_audios/${ttsRequestId}-${uuidv4()}.mp3`;
 
     await updateTTSRequestInDB(ttsRequestId, 'processed', audioUrl);
-    logger.info(`✅ TTS Request ${ttsRequestId} processed successfully.`);
+    logger.info(`✅ TTS Request ID ${ttsRequestId} processed successfully.`);
     return audioUrl;
   } catch (error) {
     await updateTTSRequestInDB(ttsRequestId, 'failed');
@@ -119,14 +94,4 @@ const processTTSRequest = async (ttsRequestId, message, voice, useS3 = true) => 
   }
 };
 
-const getAvailableVoices = async () => [
-  { id: '0AUs737h1lTdWscPWdcj', name: 'Luminessence - Light Mirror' },
-  { id: 'pqHfZKP75CvOlQylNhV4', name: 'Bill' },
-  { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel' },
-];
-
-module.exports = {
-  generateTTS,
-  processTTSRequest,
-  getAvailableVoices,
-};
+module.exports = { processTTSRequest, generateTTS };
