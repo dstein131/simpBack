@@ -27,8 +27,8 @@ const ttsQueue = new Bull('ttsQueue', {
     host: REDIS_HOST,
     port: REDIS_PORT,
     password: REDIS_PASSWORD,
-    // Optional: Add more Redis options if needed
-    // tls: {}, // If connecting to a secured Redis instance
+    tls: {}, // Required for secure connections to Azure Redis Cache
+    connectTimeout: 10000, // 10 seconds timeout for establishing a connection
   },
 });
 
