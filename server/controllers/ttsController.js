@@ -258,12 +258,19 @@ const getTTSRequests = async (req, res) => {
 const getTTSRequestsByCreator = async (req, res) => {
   try {
     const { creatorId } = req.params;
+    const requestingUser = req.user; // Assuming `req.user` is populated by your auth middleware
 
-    console.log(`Fetching TTS requests for Creator ID: ${creatorId}`);
+    console.log(`User ${requestingUser.id} is fetching TTS requests for Creator ID: ${creatorId}`);
 
     // Validate creatorId
     if (!creatorId) {
       return res.status(400).json({ error: 'Creator ID is required.' });
+    }
+
+    // Check if the requesting user is the creator or has admin privileges
+    // Assuming `requestingUser.role` exists and 'admin' is a possible role
+    if (requestingUser.role !== 'admin' && requestingUser.id !== parseInt(creatorId, 10)) {
+      return res.status(403).json({ error: 'Forbidden: You do not have access to these resources.' });
     }
 
     // Optional: Validate the creator exists
@@ -272,11 +279,25 @@ const getTTSRequestsByCreator = async (req, res) => {
       return res.status(404).json({ error: 'Creator not found.' });
     }
 
-    // Fetch TTS requests associated with the creator
+    // Pagination parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    // Fetch total count for pagination
+    const [countResult] = await db.query(
+      'SELECT COUNT(*) AS total FROM tts_requests WHERE creator_id = ?',
+      [creatorId]
+    );
+    const total = countResult[0].total;
+    const totalPages = Math.ceil(total / limit);
+
+    // Fetch TTS requests with pagination
     const [ttsRequests] = await db.query(
       `SELECT 
          tr.id AS ttsRequestId, 
          tr.user_id AS userId, 
+         tr.message,        -- Added message field
          tr.status, 
          tr.processed_at, 
          tr.audio_url AS audioUrl, 
@@ -285,22 +306,24 @@ const getTTSRequestsByCreator = async (req, res) => {
        FROM tts_requests tr
        JOIN users u ON tr.user_id = u.id
        WHERE tr.creator_id = ?
-       ORDER BY tr.created_at DESC`,
-      [creatorId]
+       ORDER BY tr.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [creatorId, limit, offset]
     );
 
-    // Optionally, you can implement pagination
-    // const page = parseInt(req.query.page) || 1;
-    // const limit = parseInt(req.query.limit) || 20;
-    // const offset = (page - 1) * limit;
-    // Modify the query above to include LIMIT and OFFSET
-
-    res.status(200).json({ ttsRequests });
+    res.status(200).json({
+      page,
+      limit,
+      total,
+      totalPages,
+      ttsRequests,
+    });
   } catch (error) {
     logger.error('❌ Error in getTTSRequestsByCreator:', error);
     res.status(500).json({ error: 'Failed to fetch TTS requests for the creator.' });
   }
 };
+
 
 
 
