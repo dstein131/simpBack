@@ -187,6 +187,37 @@ const getAvailableVoicesController = async (req, res) => {
 };
 
 /**
+ * Get TTS Requests by Creator ID
+ * GET /api/tts/creator/:creatorId
+ */
+const getTTSRequestsByCreatorId = async (req, res) => {
+  try {
+    const { creatorId } = req.params;
+
+    if (!creatorId) {
+      return res.status(400).json({ error: 'Creator ID is required.' });
+    }
+
+    // Query the database for TTS requests associated with the given creator ID
+    const [ttsRequests] = await db.query(
+      'SELECT id AS ttsRequestId, user_id, status, processed_at, voice, audio_url FROM tts_requests WHERE creator_id = ?',
+      [creatorId]
+    );
+
+    // If no records are found, respond accordingly
+    if (ttsRequests.length === 0) {
+      return res.status(404).json({ message: 'No TTS requests found for this creator.' });
+    }
+
+    res.status(200).json(ttsRequests);
+  } catch (error) {
+    console.error('❌ Error fetching TTS requests by creator ID:', error);
+    res.status(500).json({ error: 'Failed to fetch TTS requests.' });
+  }
+};
+
+
+/**
  * Update TTS Request Status
  * PUT /api/tts/:id/status
  */
@@ -256,4 +287,5 @@ module.exports = {
   updateTTSRequestStatus,
   getAvailableVoices: getAvailableVoicesController,
   downloadTTSAudio,
+  getTTSRequestsByCreatorId,
 };
