@@ -25,7 +25,6 @@ const submitTTSRequest = async (req, res) => {
   try {
     const { message, voice, creatorId } = req.body;
     const userId = req.user.id; // Derived from authentication middleware
-    const userRole = req.user.role; // 'admin', 'creator', etc.
 
     console.log('Received TTS Request:', { message, voice, userId, creatorId });
 
@@ -40,18 +39,6 @@ const submitTTSRequest = async (req, res) => {
 
     if (!creatorId) {
       return res.status(400).json({ error: 'Creator ID is required.' });
-    }
-
-    // If the user is not an admin, ensure they are submitting for their own creatorId
-    if (userRole !== 'admin') {
-      if (req.user.creatorId !== parseInt(creatorId, 10)) {
-        logger.warn(
-          `User ${userId} with role ${userRole} attempted to submit TTS request for Creator ID ${creatorId}`
-        );
-        return res
-          .status(403)
-          .json({ error: 'Forbidden: You cannot submit TTS requests for this creator.' });
-      }
     }
 
     // Validate the creator ID exists in the database
@@ -101,6 +88,7 @@ const submitTTSRequest = async (req, res) => {
   }
 };
 
+
 /**
  * Download TTS Audio
  * GET /api/tts/download/:id
@@ -109,14 +97,12 @@ const downloadTTSAudio = async (req, res) => {
   try {
     const { id } = req.params; // TTS request ID
     const userId = req.user.id; // Derived from authentication middleware
-    const userRole = req.user.role; // 'admin', 'creator', etc.
-    const userCreatorId = req.user.creatorId;
 
     console.log(`User ID: ${userId} is requesting download for TTS Request ID: ${id}`);
 
     // Fetch TTS request details from the database
     const [ttsRequests] = await db.query(
-      'SELECT audio_url, status, creator_id FROM tts_requests WHERE id = ?',
+      'SELECT audio_url, status FROM tts_requests WHERE id = ?',
       [id]
     );
 
@@ -124,18 +110,7 @@ const downloadTTSAudio = async (req, res) => {
       return res.status(404).json({ error: 'TTS request not found.' });
     }
 
-    const { audio_url: audioUrl, status, creator_id: creatorId } = ttsRequests[0];
-
-    // Authorization Check:
-    // Allow if user is admin or user owns the creator_id associated with the TTS request
-    if (userRole !== 'admin' && userCreatorId !== creatorId) {
-      logger.warn(
-        `User ${userId} with role ${userRole} attempted to download TTS Request ID ${id} for Creator ID ${creatorId}`
-      );
-      return res
-        .status(403)
-        .json({ error: 'Forbidden: You do not have access to this TTS audio.' });
-    }
+    const { audio_url: audioUrl, status } = ttsRequests[0];
 
     // Ensure TTS processing is completed
     if (status !== 'completed') {
@@ -180,6 +155,7 @@ const downloadTTSAudio = async (req, res) => {
     res.status(500).json({ error: 'Failed to download TTS audio.' });
   }
 };
+
 
 /**
  * Get Available Voices
