@@ -304,7 +304,8 @@ const getTTSRequestsByCreator = async (req, res) => {
     const [ttsRequests] = await db.query(
       `SELECT 
          tr.id AS ttsRequestId, 
-         tr.user_id AS userId,        
+         tr.user_id AS userId, 
+         IFNULL(NULLIF(TRIM(tr.message), ''), 'No message provided') AS message, 
          tr.status, 
          tr.processed_at, 
          tr.audio_url AS audioUrl, 
@@ -331,6 +332,7 @@ const getTTSRequestsByCreator = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch TTS requests for the creator.' });
   }
 };
+
 
 
 
