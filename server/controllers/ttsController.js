@@ -315,42 +315,27 @@ const getTTSRequests = async (req, res) => {
 };
 
 
-/**
- * Get TTS Requests by Creator
- * GET /api/tts/creator/:creatorId
- */
 const getTTSRequestsByCreator = async (req, res) => {
   try {
- 
     const { userId, creatorId, role, page = 1, limit = 50 } = req.query;
 
     logger.info(`User ID: ${userId}, Role: ${role}, Creator ID: ${creatorId} requested TTS data`);
 
     // Validate required parameters
     if (!creatorId) {
-      logger.warn(`Creator ID not provided in request by User ID: ${userId}`);
+      logger.warn(`Creator ID not provided in request`);
       return res.status(400).json({ error: 'Creator ID is required.' });
     }
 
-    if (!userId || !role) {
-      logger.warn('User ID or Role is missing in request parameters');
-      return res.status(400).json({ error: 'User ID and Role are required.' });
+    // Check if the user's creatorId matches the requested creatorId
+    if (parseInt(req.user.creatorId, 10) !== parseInt(creatorId, 10)) {
+      logger.warn(
+        `User's Creator ID ${req.user.creatorId} does not match requested Creator ID ${creatorId}`
+      );
+      return res.status(403).json({ error: 'Forbidden: You do not have access to these resources.' });
     }
 
-    // If the user is not an admin, ensure they are accessing their own creatorId
-    if (role !== 'admin') {
-      logger.info(`Non-admin user ${userId} attempting to access data`);
-      if (parseInt(userId, 10) !== parseInt(creatorId, 10)) {
-        logger.warn(
-          `User ${userId} with role ${role} attempted to access Creator ID ${creatorId}, which does not match`
-        );
-        return res
-          .status(403)
-          .json({ error: 'Forbidden: You do not have access to these resources.' });
-      }
-    }
-
-    // Calculate pagination parameters
+    // Pagination
     const parsedPage = parseInt(page, 10) || 1;
     const parsedLimit = parseInt(limit, 10) || 50;
     const offset = (parsedPage - 1) * parsedLimit;
@@ -368,7 +353,7 @@ const getTTSRequestsByCreator = async (req, res) => {
       `SELECT 
          tr.id AS ttsRequestId, 
          tr.user_id AS userId, 
-         tr.message,        -- Included message field
+         tr.message,        
          tr.status, 
          tr.processed_at, 
          tr.audio_url AS audioUrl, 
@@ -395,6 +380,7 @@ const getTTSRequestsByCreator = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch TTS requests for the creator.' });
   }
 };
+
 
 
 // Export controller functions
