@@ -21,14 +21,19 @@ logger.debug(`Initializing Bull queue with Redis configuration:
   Password: ${REDIS_PASSWORD ? '********' : 'Not Set'}
 `);
 
-// Initialize the queue with Redis connection details
+// Initialize the queue with Redis connection details and enhanced options
 const ttsQueue = new Bull('ttsQueue', {
   redis: {
     host: REDIS_HOST,
     port: REDIS_PORT,
     password: REDIS_PASSWORD,
-    tls: {}, // Required for secure connections to Azure Redis Cache
-    connectTimeout: 10000, // 10 seconds timeout for establishing a connection
+    tls: {}, // Required for Azure Redis Cache secure connections
+    connectTimeout: 10000, // 10 seconds timeout for connecting to Redis
+    retryStrategy: (times) => {
+      const delay = Math.min(times * 50, 2000); // Exponential backoff, max 2 seconds
+      logger.warn(`Retrying Redis connection in ${delay}ms... (Attempt ${times})`);
+      return delay;
+    },
   },
 });
 
@@ -55,7 +60,7 @@ ttsQueue.process(async (job) => {
     const audioUrl = await processTTSRequest(ttsRequestId, message, voice, useS3);
     logger.info(`✅ Successfully processed TTS Request ID: ${ttsRequestId}, Audio URL: ${audioUrl}`);
 
-    // After processing, update the status of the TTS request in the database to "completed"
+    // Update the status of the TTS request in the database to "completed"
     const updateQuery = 'UPDATE tts_requests SET status = "completed", audio_url = ? WHERE id = ?';
     const [updateResult] = await db.query(updateQuery, [audioUrl, ttsRequestId]);
 
