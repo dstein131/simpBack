@@ -45,8 +45,12 @@ const submitTTSRequest = async (req, res) => {
     // If the user is not an admin, ensure they are submitting for their own creatorId
     if (userRole !== 'admin') {
       if (req.user.creatorId !== parseInt(creatorId, 10)) {
-        logger.warn(`User ${userId} with role ${userRole} attempted to submit TTS request for Creator ID ${creatorId}`);
-        return res.status(403).json({ error: 'Forbidden: You cannot submit TTS requests for this creator.' });
+        logger.warn(
+          `User ${userId} with role ${userRole} attempted to submit TTS request for Creator ID ${creatorId}`
+        );
+        return res
+          .status(403)
+          .json({ error: 'Forbidden: You cannot submit TTS requests for this creator.' });
       }
     }
 
@@ -125,8 +129,12 @@ const downloadTTSAudio = async (req, res) => {
     // Authorization Check:
     // Allow if user is admin or user owns the creator_id associated with the TTS request
     if (userRole !== 'admin' && userCreatorId !== creatorId) {
-      logger.warn(`User ${userId} with role ${userRole} attempted to download TTS Request ID ${id} for Creator ID ${creatorId}`);
-      return res.status(403).json({ error: 'Forbidden: You do not have access to this TTS audio.' });
+      logger.warn(
+        `User ${userId} with role ${userRole} attempted to download TTS Request ID ${id} for Creator ID ${creatorId}`
+      );
+      return res
+        .status(403)
+        .json({ error: 'Forbidden: You do not have access to this TTS audio.' });
     }
 
     // Ensure TTS processing is completed
@@ -224,8 +232,12 @@ const updateTTSRequestStatus = async (req, res) => {
     // Authorization Check:
     // Allow if user is admin or user owns the creator associated with the TTS request
     if (userRole !== 'admin' && req.user.creatorId !== creatorId) {
-      logger.warn(`User ${userId} with role ${userRole} attempted to update TTS Request ID ${id} for Creator ID ${creatorId}`);
-      return res.status(403).json({ error: 'Forbidden: You do not have permission to update this TTS request.' });
+      logger.warn(
+        `User ${userId} with role ${userRole} attempted to update TTS Request ID ${id} for Creator ID ${creatorId}`
+      );
+      return res
+        .status(403)
+        .json({ error: 'Forbidden: You do not have permission to update this TTS request.' });
     }
 
     // Prepare the update query
@@ -324,8 +336,12 @@ const getTTSRequestsByCreator = async (req, res) => {
     // If the user is not an admin, ensure they are accessing their own creatorId
     if (userRole !== 'admin') {
       if (userCreatorId !== parseInt(creatorId, 10)) {
-        logger.warn(`User ${userId} with role ${userRole} attempted to access Creator ID ${creatorId}`);
-        return res.status(403).json({ error: 'Forbidden: You do not have access to these resources.' });
+        logger.warn(
+          `User ${userId} with role ${userRole} attempted to access Creator ID ${creatorId}`
+        );
+        return res
+          .status(403)
+          .json({ error: 'Forbidden: You do not have access to these resources.' });
       }
     }
 
