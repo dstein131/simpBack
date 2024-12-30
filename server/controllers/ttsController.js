@@ -322,25 +322,27 @@ const getTTSRequests = async (req, res) => {
 const getTTSRequestsByCreator = async (req, res) => {
   try {
     const { creatorId } = req.params;
-    const requestingUser = req.user; // Populated by authenticateToken middleware
-    const userId = requestingUser.id;
-    const userRole = requestingUser.role;
-    const userCreatorId = requestingUser.creatorId;
+    const { userId, role, page = 1, limit = 50 } = req.query;
 
-    logger.info(`User ID: ${userId}, Role: ${userRole} is accessing Creator ID: ${creatorId}`);
+    logger.info(`User ID: ${userId}, Role: ${role}, Creator ID: ${creatorId} requested TTS data`);
 
-    // Validate creatorId
+    // Validate required parameters
     if (!creatorId) {
       logger.warn(`Creator ID not provided in request by User ID: ${userId}`);
       return res.status(400).json({ error: 'Creator ID is required.' });
     }
 
+    if (!userId || !role) {
+      logger.warn('User ID or Role is missing in request parameters');
+      return res.status(400).json({ error: 'User ID and Role are required.' });
+    }
+
     // If the user is not an admin, ensure they are accessing their own creatorId
-    if (userRole !== 'admin') {
-      logger.info(`User's Creator ID: ${userCreatorId}, Requested Creator ID: ${creatorId}`);
-      if (userCreatorId !== parseInt(creatorId, 10)) {
+    if (role !== 'admin') {
+      logger.info(`Non-admin user ${userId} attempting to access data`);
+      if (parseInt(userId, 10) !== parseInt(creatorId, 10)) {
         logger.warn(
-          `User ${userId} with role ${userRole} attempted to access Creator ID ${creatorId}, which does not match their own Creator ID ${userCreatorId}`
+          `User ${userId} with role ${role} attempted to access Creator ID ${creatorId}, which does not match`
         );
         return res
           .status(403)
@@ -348,18 +350,18 @@ const getTTSRequestsByCreator = async (req, res) => {
       }
     }
 
-    // Pagination parameters
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 50;
-    const offset = (page - 1) * limit;
+    // Calculate pagination parameters
+    const parsedPage = parseInt(page, 10) || 1;
+    const parsedLimit = parseInt(limit, 10) || 50;
+    const offset = (parsedPage - 1) * parsedLimit;
 
     // Fetch total count for pagination
     const [countResult] = await db.query(
       'SELECT COUNT(*) AS total FROM tts_requests WHERE creator_id = ?',
       [creatorId]
     );
-    const total = countResult[0].total;
-    const totalPages = Math.ceil(total / limit);
+    const total = countResult[0]?.total || 0;
+    const totalPages = Math.ceil(total / parsedLimit);
 
     // Fetch TTS requests with pagination
     const [ttsRequests] = await db.query(
@@ -377,12 +379,12 @@ const getTTSRequestsByCreator = async (req, res) => {
        WHERE tr.creator_id = ?
        ORDER BY tr.created_at DESC
        LIMIT ? OFFSET ?`,
-      [creatorId, limit, offset]
+      [creatorId, parsedLimit, offset]
     );
 
     res.status(200).json({
-      page,
-      limit,
+      page: parsedPage,
+      limit: parsedLimit,
       total,
       totalPages,
       ttsRequests,
@@ -393,6 +395,7 @@ const getTTSRequestsByCreator = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch TTS requests for the creator.' });
   }
 };
+
 
 // Export controller functions
 module.exports = {
