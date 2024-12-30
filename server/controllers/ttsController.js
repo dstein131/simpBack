@@ -286,7 +286,7 @@ const getTTSRequestsByCreator = async (req, res) => {
 
     logger.info(`User ID: ${userId}, Role: ${role}, Creator ID: ${creatorId} requested TTS data`);
 
-       // Pagination
+    // Pagination
     const parsedPage = parseInt(page, 10) || 1;
     const parsedLimit = parseInt(limit, 10) || 50;
     const offset = (parsedPage - 1) * parsedLimit;
@@ -303,8 +303,7 @@ const getTTSRequestsByCreator = async (req, res) => {
     const [ttsRequests] = await db.query(
       `SELECT 
          tr.id AS ttsRequestId, 
-         tr.user_id AS userId, 
-         tr.message,        
+         tr.user_id AS userId,        
          tr.status, 
          tr.processed_at, 
          tr.audio_url AS audioUrl, 
@@ -313,7 +312,7 @@ const getTTSRequestsByCreator = async (req, res) => {
        FROM tts_requests tr
        JOIN users u ON tr.user_id = u.id
        WHERE tr.creator_id = ?
-       ORDER BY tr.created_at DESC
+       ORDER BY tr.processed_at DESC
        LIMIT ? OFFSET ?`,
       [creatorId, parsedLimit, offset]
     );
@@ -331,6 +330,7 @@ const getTTSRequestsByCreator = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch TTS requests for the creator.' });
   }
 };
+
 
 
 
