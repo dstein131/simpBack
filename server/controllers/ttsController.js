@@ -173,7 +173,7 @@ const downloadTTSAudio = async (req, res) => {
 const getAvailableVoicesController = async (req, res) => {
   try {
     const voices = [
-      { id: '0AUs737h1lTdWscPWdcj', name: 'Luminessence - Light Mirror' },
+      { id: 's2wvuS7SwITYg8dqsJdn', name: 'Old Italian Man' },
       { id: 'pqHfZKP75CvOlQylNhV4', name: 'Bill' },
       { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel' },
     ];
