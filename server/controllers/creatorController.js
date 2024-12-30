@@ -89,10 +89,27 @@ const deleteCreator = async (req, res) => {
   }
 };
 
+// Get TTS requests for a specific creator
+const getTTSRequestsForCreator = async (req, res) => {
+    try {
+      const { id } = req.params; // Creator ID
+      const [ttsRequests] = await db.query(
+        'SELECT tts_requests.id AS ttsRequestId, tts_requests.message, tts_requests.voice, tts_requests.status, tts_requests.audio_url FROM tts_requests WHERE creator_id = ? ORDER BY tts_requests.created_at DESC',
+        [id]
+      );
+  
+      res.status(200).json(ttsRequests);
+    } catch (error) {
+      console.error('❌ Error fetching TTS requests for creator:', error);
+      res.status(500).json({ error: 'Failed to fetch TTS requests.' });
+    }
+  };
+
 module.exports = {
   getCreators,
   getCreatorById,
   createCreator,
   updateCreator,
   deleteCreator,
+  getTTSRequestsForCreator,
 };
