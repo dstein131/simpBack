@@ -314,6 +314,7 @@ const getTTSRequests = async (req, res) => {
   }
 };
 
+
 /**
  * Get TTS Requests by Creator
  * GET /api/tts/creator/:creatorId
@@ -346,7 +347,6 @@ const getTTSRequestsByCreator = async (req, res) => {
           .json({ error: 'Forbidden: You do not have access to these resources.' });
       }
     }
-
 
     // Pagination parameters
     const page = parseInt(req.query.page) || 1;
