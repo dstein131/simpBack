@@ -15,7 +15,6 @@ router.get('/', authenticateToken, getTTSRequests);  // GET route to fetch TTS r
 router.put('/:id', authenticateToken, updateTTSRequestStatus);  // PUT route to update TTS request status
 router.get('/voices', authenticateToken, getAvailableVoices);  // GET route to fetch available voices
 router.get('/download/:id', authenticateToken, downloadTTSAudio);  // GET route to download TTS audio
-router.get('/creator/:creatorId', authenticateToken, getTTSRequestsByCreatorId); // GET route to fetch TTS requests by creator ID
 
 
 // Export the router

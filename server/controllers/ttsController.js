@@ -287,5 +287,5 @@ module.exports = {
   updateTTSRequestStatus,
   getAvailableVoices: getAvailableVoicesController,
   downloadTTSAudio,
-  getTTSRequestsByCreatorId,
+  
 };
