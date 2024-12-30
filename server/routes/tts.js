@@ -10,7 +10,7 @@ const {
   downloadTTSAudio,
   getTTSRequestsByCreator, // Import the new controller
 } = require('../controllers/ttsController'); // Ensure correct path
-const { authenticateToken } = require('../middleware/authenticateToken'); // Ensure correct path
+const { authenticateToken } = require('../middlewares/auth'); // Import the authentication middleware
 
 // Define routes
 
