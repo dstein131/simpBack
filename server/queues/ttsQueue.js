@@ -13,7 +13,6 @@ const ttsQueue = new Bull('ttsQueue', {
 });
 
 // Define the processing function
-// Define the processing function
 ttsQueue.process(async (job) => {
   const { ttsRequestId, message, voice, useS3 } = job.data;
 
