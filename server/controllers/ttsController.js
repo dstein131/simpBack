@@ -59,8 +59,8 @@ const submitTTSRequest = async (req, res) => {
 
     // Insert the TTS request into the database
     const [result] = await db.query(
-      'INSERT INTO tts_requests (user_id, creator_id, status, voice) VALUES (?, ?, ?, ?)',
-      [userId, creatorId, 'pending', voice]
+      'INSERT INTO tts_requests (user_id, creator_id, message, status, voice) VALUES (?, ?, ?, ?, ?)',
+      [userId, creatorId, message, 'pending', voice]
     );
 
     const ttsRequestId = result.insertId;
@@ -95,6 +95,7 @@ const submitTTSRequest = async (req, res) => {
     res.status(500).json({ error: 'Failed to submit TTS request.' });
   }
 };
+
 
 
 /**
