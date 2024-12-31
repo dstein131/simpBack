@@ -206,7 +206,6 @@ const updateTTSRequestStatus = async (req, res) => {
     const [ttsRequests] = await db.query('SELECT * FROM tts_requests WHERE id = ?', [id]);
 
     if (ttsRequests.length === 0) {
-      console.error(`TTS Request ID ${id} not found.`);
       return res.status(404).json({ error: 'TTS request not found.' });
     }
 
@@ -223,22 +222,16 @@ const updateTTSRequestStatus = async (req, res) => {
 
     // Emit socket event to notify the creator's room about the status change
     if (req.app.io) {
-      try {
-        req.app.io.to(`creator-room-${ttsRequest.creator_id}`).emit('tts-request', {
-          ttsRequestId: id,
-          status,
-          audioUrl,
-          message: ttsRequest.message,
-          voice: ttsRequest.voice,
-          creatorId: ttsRequest.creator_id,
-          userId: ttsRequest.user_id,
-        });
-        console.log(`Socket event emitted to creator-room-${ttsRequest.creator_id} for TTS Request ID ${id}`);
-      } catch (socketError) {
-        console.error(`❌ Failed to emit socket event for TTS Request ID ${id}:`, socketError);
-      }
-    } else {
-      console.warn('⚠️ req.app.io is undefined. Socket event not emitted.');
+      req.app.io.to(`creator-room-${ttsRequest.creator_id}`).emit('tts-request-updated', {
+        ttsRequestId: id,
+        status,
+        audioUrl,
+        message: ttsRequest.message,
+        voice: ttsRequest.voice,
+        creatorId: ttsRequest.creator_id,
+        userId: ttsRequest.user_id,
+      });
+      console.log(`Socket event emitted to creator-room-${ttsRequest.creator_id} for TTS Request ID ${id}`);
     }
 
     // Respond with a success message
@@ -250,6 +243,7 @@ const updateTTSRequestStatus = async (req, res) => {
     res.status(500).json({ error: 'Failed to update TTS request status.' });
   }
 };
+
 
 
 
