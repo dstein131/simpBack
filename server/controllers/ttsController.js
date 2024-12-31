@@ -194,7 +194,7 @@ const updateTTSRequestStatus = async (req, res) => {
     const { id } = req.params; // TTS Request ID
     const { status, audioUrl } = req.body; // New status and optional audio URL
 
-    console.log(`Updating TTS Request ID ${id} with status ${status} and audio URL ${audioUrl || 'None'}`);
+    console.log(`Updating TTS Request ID ${id} with status ${status} and audio URL ${audioUrl}`);
 
     // Validate status
     const validStatuses = ['pending', 'processing', 'completed', 'failed'];
@@ -218,20 +218,30 @@ const updateTTSRequestStatus = async (req, res) => {
     // Update the TTS request in the database
     await db.query(updateQuery, updateValues);
 
-    console.log(`TTS Request ID ${id} successfully updated to status ${status}`);
+    console.log(`TTS Request ID ${id} status updated to ${status}`);
 
     // Emit socket event to notify the creator's room about the status change
     if (req.app.io) {
-      req.app.io.to(`creator-room-${ttsRequest.creator_id}`).emit('tts-request-updated', {
+      const payload = {
         ttsRequestId: id,
         status,
-        audioUrl,
+        audioUrl: audioUrl || null,
         message: ttsRequest.message,
         voice: ttsRequest.voice,
         creatorId: ttsRequest.creator_id,
         userId: ttsRequest.user_id,
-      });
-      console.log(`Socket event emitted to creator-room-${ttsRequest.creator_id} for TTS Request ID ${id}`);
+      };
+
+      // Emit a specific event for 'completed' and 'failed' statuses
+      if (status === 'completed') {
+        req.app.io.to(`creator-room-${ttsRequest.creator_id}`).emit('tts-request', payload);
+      } else if (status === 'failed') {
+        req.app.io.to(`creator-room-${ttsRequest.creator_id}`).emit('tts-request-failed', payload);
+      }
+
+      console.log(
+        `Socket event emitted to creator-room-${ttsRequest.creator_id} for TTS Request ID ${id} with status ${status}`
+      );
     }
 
     // Respond with a success message
@@ -243,6 +253,7 @@ const updateTTSRequestStatus = async (req, res) => {
     res.status(500).json({ error: 'Failed to update TTS request status.' });
   }
 };
+
 
 
 
