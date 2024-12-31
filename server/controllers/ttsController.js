@@ -177,6 +177,7 @@ const getAvailableVoicesController = async (req, res) => {
   try {
     const voices = [
       { id: 's2wvuS7SwITYg8dqsJdn', name: 'Old Italian Man' },
+      { id: '3DxWrjC62YRLoXiYBGB0', name: 'Evil Orc' },
       { id: '2xnESBHcLHCxcxvOM2bJ', name: 'Middle-Aged British Man' },
       { id: 'rl410D8bMOfIkD4QyPae', name: 'Midwestern American Man' },
       { id: 'pqHfZKP75CvOlQylNhV4', name: 'Bill' },
