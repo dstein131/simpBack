@@ -100,6 +100,7 @@ const updateTTSRequestInDB = async (ttsRequestId, status, audioUrl = null) => {
   }
 };
 
+
 /*********************************************
  * Process TTS Request
  ********************************************/
@@ -111,7 +112,7 @@ const processTTSRequest = async (ttsRequestId, message, voice, useS3 = true) => 
       ? await saveTTSAudioToS3(ttsRequestId, audioData)
       : `/tts_audios/${ttsRequestId}-${uuidv4()}.mp3`; // For local storage
 
-    await updateTTSRequestInDB(ttsRequestId, 'processed', audioUrl);
+    await updateTTSRequestInDB(ttsRequestId, 'completed', audioUrl);
     logger.info(`✅ TTS request ID ${ttsRequestId} processed successfully with audio URL: ${audioUrl}`);
     return audioUrl;
   } catch (error) {
