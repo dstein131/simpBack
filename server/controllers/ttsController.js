@@ -106,7 +106,6 @@ const submitTTSRequest = async (req, res) => {
 };
 
 
-
 /**
  * Download TTS Audio
  * GET /api/tts/download/:id
@@ -171,12 +170,11 @@ const downloadTTSAudio = async (req, res) => {
 
     const s3Response = await s3Client.send(command);
 
+    // Stream the audio file to the client
     if (!res.headersSent) {
-      // Ensure headers are set before streaming the response
       res.setHeader('Content-Type', 'audio/mpeg');
       res.setHeader('Content-Disposition', `attachment; filename="audio-${id}.mp3"`);
 
-      // Stream the audio file to the client
       s3Response.Body.pipe(res)
         .on('error', (err) => {
           console.error('Error streaming audio file:', err);
@@ -190,7 +188,10 @@ const downloadTTSAudio = async (req, res) => {
     }
   } catch (error) {
     console.error('❌ Error in downloadTTSAudio:', error);
-    if (!res.headersSent) {
+
+    if (error.name === 'ERR_HTTP_HEADERS_SENT') {
+      console.warn('Headers already sent. Skipping further actions.');
+    } else if (!res.headersSent) {
       res.status(500).json({ error: 'Failed to download TTS audio.' });
     }
   }
