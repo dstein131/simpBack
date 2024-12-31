@@ -121,7 +121,9 @@ const downloadTTSAudio = async (req, res) => {
 
     // Validate userId
     if (!userId) {
-      res.status(400).json({ error: 'User ID is required.' });
+      if (!res.headersSent) {
+        res.status(400).json({ error: 'User ID is required.' });
+      }
       return;
     }
 
@@ -132,7 +134,9 @@ const downloadTTSAudio = async (req, res) => {
     );
 
     if (ttsRequests.length === 0) {
-      res.status(404).json({ error: 'TTS request not found or not associated with this user.' });
+      if (!res.headersSent) {
+        res.status(404).json({ error: 'TTS request not found or not associated with this user.' });
+      }
       return;
     }
 
@@ -140,12 +144,16 @@ const downloadTTSAudio = async (req, res) => {
 
     // Ensure TTS processing is completed
     if (status !== 'completed') {
-      res.status(400).json({ error: 'Audio file is still being processed.' });
+      if (!res.headersSent) {
+        res.status(400).json({ error: 'Audio file is still being processed.' });
+      }
       return;
     }
 
     if (!audioUrl) {
-      res.status(400).json({ error: 'Audio file URL not available.' });
+      if (!res.headersSent) {
+        res.status(400).json({ error: 'Audio file URL not available.' });
+      }
       return;
     }
 
@@ -164,21 +172,23 @@ const downloadTTSAudio = async (req, res) => {
 
     const s3Response = await s3Client.send(command);
 
-    // Ensure headers are set once before streaming the response
-    res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Content-Disposition', `attachment; filename="audio-${id}.mp3"`);
+    if (!res.headersSent) {
+      // Ensure headers are set before streaming the response
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Content-Disposition', `attachment; filename="audio-${id}.mp3"`);
 
-    // Pipe the response to the client
-    s3Response.Body.pipe(res)
-      .on('error', (err) => {
-        console.error('Error streaming audio file:', err);
-        if (!res.headersSent) {
-          res.status(500).json({ error: 'Error streaming audio file.' });
-        }
-      })
-      .on('finish', () => {
-        console.log(`Audio file for TTS request ID ${id} served successfully.`);
-      });
+      // Stream the audio file to the client
+      s3Response.Body.pipe(res)
+        .on('error', (err) => {
+          console.error('Error streaming audio file:', err);
+          if (!res.headersSent) {
+            res.status(500).json({ error: 'Error streaming audio file.' });
+          }
+        })
+        .on('finish', () => {
+          console.log(`Audio file for TTS request ID ${id} served successfully.`);
+        });
+    }
   } catch (error) {
     console.error('❌ Error in downloadTTSAudio:', error);
     if (!res.headersSent) {
@@ -186,6 +196,7 @@ const downloadTTSAudio = async (req, res) => {
     }
   }
 };
+
 
 
 
