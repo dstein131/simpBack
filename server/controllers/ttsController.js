@@ -66,7 +66,7 @@ const submitTTSRequest = async (req, res) => {
         voice,
         userId,
         creatorId,
-        status: 'pending',
+        status: 'processing',
       });
       console.log(`Socket event emitted to creator-room-${creatorId} for TTS Request ID ${ttsRequestId}`);
     }
@@ -194,7 +194,7 @@ const updateTTSRequestStatus = async (req, res) => {
     const { id } = req.params; // TTS Request ID
     const { status, audioUrl } = req.body; // New status and optional audio URL
 
-    console.log(`Updating TTS Request ID ${id} with status ${status} and audio URL ${audioUrl}`);
+    console.log(`Updating TTS Request ID ${id} with status: ${status}, audioUrl: ${audioUrl}`);
 
     // Validate status
     const validStatuses = ['pending', 'processing', 'completed', 'failed'];
@@ -204,7 +204,6 @@ const updateTTSRequestStatus = async (req, res) => {
 
     // Fetch the TTS request to check if it exists
     const [ttsRequests] = await db.query('SELECT * FROM tts_requests WHERE id = ?', [id]);
-
     if (ttsRequests.length === 0) {
       return res.status(404).json({ error: 'TTS request not found.' });
     }
@@ -218,14 +217,14 @@ const updateTTSRequestStatus = async (req, res) => {
     // Update the TTS request in the database
     await db.query(updateQuery, updateValues);
 
-    console.log(`TTS Request ID ${id} status updated to ${status}`);
+    console.log(`TTS Request ID ${id} successfully updated to status: ${status}`);
 
     // Emit socket event to notify the creator's room about the status change
     if (req.app.io) {
       req.app.io.to(`creator-room-${ttsRequest.creator_id}`).emit('tts-request', {
         ttsRequestId: id,
         status,
-        audioUrl,
+        audioUrl: audioUrl || null,
         message: ttsRequest.message,
         voice: ttsRequest.voice,
         creatorId: ttsRequest.creator_id,
@@ -236,13 +235,14 @@ const updateTTSRequestStatus = async (req, res) => {
 
     // Respond with a success message
     res.status(200).json({
-      message: `TTS request ${status} successfully updated.`,
+      message: `TTS request status updated successfully to: ${status}`,
     });
   } catch (error) {
     console.error('❌ Error in updateTTSRequestStatus:', error);
     res.status(500).json({ error: 'Failed to update TTS request status.' });
   }
 };
+
 
 
 
