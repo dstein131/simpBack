@@ -25,40 +25,32 @@ const submitTTSRequest = async (req, res) => {
   try {
     const { message, voice, userId, creatorId } = req.body;
 
-    console.log('Received TTS Request:', { message, voice, userId, creatorId });
+    debug('Received TTS Request:', { message, voice, userId, creatorId });
 
-    // Validate input fields
     if (!userId || !message || !voice || !creatorId) {
-      return res.status(400).json({
-        error: 'All fields (userId, message, voice, creatorId) are required.',
-      });
+      return res.status(400).json({ error: 'All fields (userId, message, voice, creatorId) are required.' });
     }
 
-    // Check if the user exists
     const [userExists] = await db.query('SELECT id FROM users WHERE id = ?', [userId]);
     if (userExists.length === 0) {
       return res.status(400).json({ error: 'Invalid user ID.' });
     }
 
-    // Check if the creator exists
     const [creatorExists] = await db.query('SELECT id FROM creators WHERE id = ?', [creatorId]);
     if (creatorExists.length === 0) {
       return res.status(400).json({ error: 'Invalid creator ID.' });
     }
 
-    // Insert the TTS request into the database
     const [result] = await db.query(
       'INSERT INTO tts_requests (user_id, creator_id, message, status, voice) VALUES (?, ?, ?, ?, ?)',
       [userId, creatorId, message, 'pending', voice]
     );
 
     const ttsRequestId = result.insertId;
-    console.log(`TTS Request Created with ID: ${ttsRequestId}`);
+    debug(`TTS Request Created with ID: ${ttsRequestId}`);
 
-    // Update the status to 'processing'
     await db.query('UPDATE tts_requests SET status = "processing" WHERE id = ?', [ttsRequestId]);
 
-    // Emit a socket event
     if (req.app.io) {
       const eventData = {
         ttsRequestId,
@@ -69,30 +61,31 @@ const submitTTSRequest = async (req, res) => {
         status: 'processing',
       };
       req.app.io.to(`creator-room-${creatorId}`).emit('tts-request', eventData);
-      console.log(`Socket event emitted to creator-room-${creatorId} for TTS Request ID ${ttsRequestId}:`, eventData);
+      debug(`Socket event emitted to creator-room-${creatorId} for TTS Request ID ${ttsRequestId}:`, eventData);
+    } else {
+      debug('Socket.IO instance is not available.');
     }
 
-    // Add the TTS processing job to the queue
     await ttsQueue.add(
       { ttsRequestId, message, voice, useS3: true },
       { attempts: 3, backoff: { type: 'exponential', delay: 5000 } }
     );
-    console.log(`TTS Request ID ${ttsRequestId} added to the processing queue.`);
+    debug(`TTS Request ID ${ttsRequestId} added to the processing queue.`);
 
-    // Send response
-    if (!res.headersSent) {
-      return res.status(201).json({
-        message: 'TTS request submitted successfully!',
-        ttsRequestId,
-      });
-    }
+    return res.status(201).json({
+      message: 'TTS request submitted successfully!',
+      ttsRequestId,
+    });
   } catch (error) {
-    console.error('❌ Error in submitTTSRequest:', error);
+    logger.error('Error in submitTTSRequest:', error);
     if (!res.headersSent) {
-      return res.status(500).json({ error: 'Failed to submit TTS request.' });
+      res.status(500).json({ error: 'Failed to submit TTS request.' });
     }
   }
 };
+
+
+
 
 /**
  * Download TTS Audio
@@ -103,6 +96,7 @@ const downloadTTSAudio = async (req, res) => {
     const { id } = req.params;
     const userId = req.query.userId;
 
+    debug(`Download request for TTS ID: ${id}, User ID: ${userId}`);
     if (!userId) {
       return res.status(400).json({ error: 'User ID is required.' });
     }
@@ -143,13 +137,13 @@ const downloadTTSAudio = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="audio-${id}.mp3"`);
 
     s3Response.Body.pipe(res).on('error', (err) => {
-      console.error('Error streaming audio file:', err);
+      logger.error('Error streaming audio file:', err);
       if (!res.headersSent) {
         res.status(500).json({ error: 'Error streaming audio file.' });
       }
     });
   } catch (error) {
-    console.error('❌ Error in downloadTTSAudio:', error);
+    logger.error('Error in downloadTTSAudio:', error);
     if (!res.headersSent) {
       res.status(500).json({ error: 'Failed to download TTS audio.' });
     }
@@ -190,33 +184,27 @@ const getAvailableVoicesController = async (req, res) => {
  */
 const updateTTSRequestStatus = async (req, res) => {
   try {
-    const { id } = req.params; // TTS Request ID
-    const { status, audioUrl } = req.body; // New status and optional audio URL
+    const { id } = req.params;
+    const { status, audioUrl } = req.body;
 
-    console.log(`Updating TTS Request ID ${id} with status: ${status}, audioUrl: ${audioUrl}`);
-
-    // Validate the status value
+    debug(`Updating TTS Request ID ${id} with status: ${status}, audioUrl: ${audioUrl}`);
     const validStatuses = ['pending', 'processing', 'completed', 'failed'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid status provided.' });
     }
 
-    // Check if the TTS request exists
     const [ttsRequests] = await db.query('SELECT * FROM tts_requests WHERE id = ?', [id]);
     if (ttsRequests.length === 0) {
       return res.status(404).json({ error: 'TTS request not found.' });
     }
 
     const ttsRequest = ttsRequests[0];
-
-    // Update the TTS request in the database
     const updateQuery = 'UPDATE tts_requests SET status = ?, audio_url = ? WHERE id = ?';
     const updateValues = [status, audioUrl || null, id];
 
     await db.query(updateQuery, updateValues);
-    console.log(`TTS Request ID ${id} successfully updated to status: ${status}`);
+    debug(`TTS Request ID ${id} successfully updated to status: ${status}`);
 
-    // Emit a socket event to notify the creator's room of the status update
     if (req.app.io) {
       const eventData = {
         ttsRequestId: id,
@@ -229,28 +217,21 @@ const updateTTSRequestStatus = async (req, res) => {
       };
 
       req.app.io.to(`creator-room-${ttsRequest.creator_id}`).emit('tts-request', eventData);
-      console.log(`Socket event emitted to creator-room-${ttsRequest.creator_id} for TTS Request ID ${id}:`, eventData);
+      debug(`Socket event emitted to creator-room-${ttsRequest.creator_id} for TTS Request ID ${id}:`, eventData);
     } else {
-      console.error('Socket.IO instance is not available.');
+      logger.error('Socket.IO instance is not available.');
     }
 
-    // Respond to the client with a success message
-    if (!res.headersSent) {
-      res.status(200).json({
-        message: `TTS request status updated successfully to: ${status}`,
-      });
-    }
+    return res.status(200).json({
+      message: `TTS request status updated successfully to: ${status}`,
+    });
   } catch (error) {
-    console.error('❌ Error in updateTTSRequestStatus:', error);
-
-    // Provide a detailed error response in development mode
+    logger.error('Error in updateTTSRequestStatus:', error);
     if (!res.headersSent) {
-      const errorMessage = process.env.NODE_ENV === 'development' ? error.message : 'Failed to update TTS request status.';
-      res.status(500).json({ error: errorMessage });
+      res.status(500).json({ error: 'Failed to update TTS request status.' });
     }
   }
 };
-
 
 
 

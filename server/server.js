@@ -71,6 +71,12 @@ io.on('connection', (socket) => {
     logger.info(`User ${socket.id} joined room: ${roomId}`);
   });
 
+  // Debugging event to confirm room joining
+  socket.on('debug-room-check', (roomId) => {
+    const rooms = Array.from(socket.rooms);
+    logger.debug(`Rooms for socket ${socket.id}:`, rooms);
+  });
+
   // Handle sending tips
   socket.on('send-tip', (data) => {
     const { streamerId, tipAmount, message } = data;
@@ -158,6 +164,13 @@ ttsQueue.on('completed', async (job, result) => {
     const creatorId = rows[0].creator_id;
 
     // Emit the 'tts-request' event to the specific creator's room
+    logger.info(`Emitting tts-request to room: creator-room-${creatorId}`);
+    logger.debug('Event Data:', {
+      ttsRequestId,
+      message,
+      voice,
+      audioUrl,
+    });
     io.to(`creator-room-${creatorId}`).emit('tts-request', {
       ttsRequestId,
       message,
@@ -192,6 +205,13 @@ ttsQueue.on('failed', async (job, err) => {
     const creatorId = rows[0].creator_id;
 
     // Emit the 'tts-request-failed' event to the specific creator's room
+    logger.info(`Emitting tts-request-failed to room: creator-room-${creatorId}`);
+    logger.debug('Event Data:', {
+      ttsRequestId,
+      message,
+      voice,
+      error: err.message,
+    });
     io.to(`creator-room-${creatorId}`).emit('tts-request-failed', {
       ttsRequestId,
       message,
