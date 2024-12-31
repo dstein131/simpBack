@@ -4,18 +4,6 @@ const db = require('../db'); // Import the database connection
 const logger = require('../logger'); // For logging
 const ttsQueue = require('../queues/ttsQueue');
 const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
-const path = require('path');
-const fs = require('fs');
-const util = require('util'); // For promisifying functions
-
-// Initialize AWS S3 Client
-const s3Client = new S3Client({
-  region: process.env.AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  },
-});
 
 /**
  * Submit a TTS Request
@@ -49,7 +37,7 @@ const submitTTSRequest = async (req, res) => {
       return res.status(400).json({ error: 'Invalid creator ID.' });
     }
 
-    // Insert the TTS request into the database
+    // Insert the TTS request into the database with 'pending' status
     const [result] = await db.query(
       'INSERT INTO tts_requests (user_id, creator_id, message, status, voice) VALUES (?, ?, ?, ?, ?)',
       [userId, creatorId, message, 'pending', voice]
@@ -61,7 +49,7 @@ const submitTTSRequest = async (req, res) => {
     // Update the status to 'processing'
     await db.query('UPDATE tts_requests SET status = "processing" WHERE id = ?', [ttsRequestId]);
 
-    // Emit a socket event
+    // Emit a socket event for 'processing' status
     if (req.app.io) {
       const eventData = {
         ttsRequestId,
@@ -72,7 +60,10 @@ const submitTTSRequest = async (req, res) => {
         status: 'processing',
       };
       req.app.io.to(`creator-room-${creatorId}`).emit('tts-request', eventData);
-      logger.info(`Socket event emitted to creator-room-${creatorId} for TTS Request ID ${ttsRequestId}:`, eventData);
+      logger.info(
+        `Socket event emitted to creator-room-${creatorId} for TTS Request ID ${ttsRequestId}:`,
+        eventData
+      );
     }
 
     // Add the TTS processing job to the queue
@@ -107,7 +98,7 @@ const downloadTTSAudio = async (req, res) => {
     const userId = req.query.userId;
 
     logger.info(`Received download request for TTS ID: ${id}, User ID: ${userId}`);
-    
+
     if (!userId) {
       logger.warn('User ID is missing in download request.');
       return res.status(400).json({ error: 'User ID is required.' });
@@ -143,10 +134,18 @@ const downloadTTSAudio = async (req, res) => {
     const key = decodeURIComponent(s3Url.pathname.slice(1));
 
     logger.info(`Preparing to download audio from S3. Bucket: ${bucketName}, Key: ${key}`);
-    
+
     const command = new GetObjectCommand({
       Bucket: bucketName,
       Key: key,
+    });
+
+    const s3Client = new S3Client({
+      region: process.env.AWS_REGION,
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      },
     });
 
     const s3Response = await s3Client.send(command);
@@ -169,15 +168,6 @@ const downloadTTSAudio = async (req, res) => {
     }
   }
 };
-
-
-
-
-
-
-
-
-
 
 /**
  * Get Available Voices
@@ -243,7 +233,11 @@ const updateTTSRequestStatus = async (req, res) => {
       };
 
       req.app.io.to(`creator-room-${ttsRequest.creator_id}`).emit('tts-request', eventData);
-      logger.info(`Socket event emitted to creator-room-${ttsRequest.creator_id} for TTS Request ID ${id}: ${JSON.stringify(eventData)}`);
+      logger.info(
+        `Socket event emitted to creator-room-${ttsRequest.creator_id} for TTS Request ID ${id}: ${JSON.stringify(
+          eventData
+        )}`
+      );
     } else {
       logger.error('Socket.IO instance is not available. Event emission skipped.');
     }
@@ -259,9 +253,6 @@ const updateTTSRequestStatus = async (req, res) => {
   }
 };
 
-
-
-
 /**
  * Get TTS Requests for Logged-in User
  * GET /api/tts
@@ -270,7 +261,7 @@ const getTTSRequests = async (req, res) => {
   try {
     const userId = req.user.id; // Derived from authentication middleware
 
-    console.log(`User ID: ${userId} is fetching their TTS requests.`);
+    logger.info(`User ID: ${userId} is fetching their TTS requests.`);
 
     // Pagination parameters
     const page = parseInt(req.query.page) || 1;
@@ -311,18 +302,26 @@ const getTTSRequests = async (req, res) => {
       ttsRequests,
     });
   } catch (error) {
-    console.error('❌ Error in getTTSRequests:', error);
     logger.error('❌ Error in getTTSRequests:', error);
     res.status(500).json({ error: 'Failed to fetch TTS requests.' });
   }
 };
 
-
+/**
+ * Get TTS Requests by Creator
+ * GET /api/tts/creator
+ */
 const getTTSRequestsByCreator = async (req, res) => {
   try {
     const { userId, creatorId, role, page = 1, limit = 50 } = req.query;
 
     logger.info(`User ID: ${userId}, Role: ${role}, Creator ID: ${creatorId} requested TTS data`);
+
+    // Validate creatorId
+    if (!creatorId) {
+      logger.warn('Creator ID is missing in request.');
+      return res.status(400).json({ error: 'Creator ID is required.' });
+    }
 
     // Pagination
     const parsedPage = parseInt(page, 10) || 1;
@@ -364,15 +363,10 @@ const getTTSRequestsByCreator = async (req, res) => {
       ttsRequests,
     });
   } catch (error) {
-    console.error('❌ Error in getTTSRequestsByCreator:', error);
     logger.error('❌ Error in getTTSRequestsByCreator:', error);
     res.status(500).json({ error: 'Failed to fetch TTS requests for the creator.' });
   }
 };
-
-
-
-
 
 // Export controller functions
 module.exports = {
