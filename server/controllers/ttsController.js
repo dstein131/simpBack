@@ -222,26 +222,16 @@ const updateTTSRequestStatus = async (req, res) => {
 
     // Emit socket event to notify the creator's room about the status change
     if (req.app.io) {
-      const payload = {
+      req.app.io.to(`creator-room-${ttsRequest.creator_id}`).emit('tts-request', {
         ttsRequestId: id,
         status,
-        audioUrl: audioUrl || null,
+        audioUrl,
         message: ttsRequest.message,
         voice: ttsRequest.voice,
         creatorId: ttsRequest.creator_id,
         userId: ttsRequest.user_id,
-      };
-
-      // Emit a specific event for 'completed' and 'failed' statuses
-      if (status === 'completed') {
-        req.app.io.to(`creator-room-${ttsRequest.creator_id}`).emit('tts-request', payload);
-      } else if (status === 'failed') {
-        req.app.io.to(`creator-room-${ttsRequest.creator_id}`).emit('tts-request-failed', payload);
-      }
-
-      console.log(
-        `Socket event emitted to creator-room-${ttsRequest.creator_id} for TTS Request ID ${id} with status ${status}`
-      );
+      });
+      console.log(`Socket event emitted to creator-room-${ttsRequest.creator_id} for TTS Request ID ${id}`);
     }
 
     // Respond with a success message
@@ -253,6 +243,7 @@ const updateTTSRequestStatus = async (req, res) => {
     res.status(500).json({ error: 'Failed to update TTS request status.' });
   }
 };
+
 
 
 
