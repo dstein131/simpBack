@@ -1,32 +1,32 @@
-// socket.js
+// src/socket.js
 
-let ioInstance;
+const { Server } = require('socket.io');
 
-const initIO = (server) => {
-  const { Server } = require('socket.io');
-  ioInstance = new Server(server, {
-    cors: {
-      origin: '*', // Adjust as needed
-      methods: ['GET', 'POST'],
-    },
-  });
+let io;
 
-  ioInstance.on('connection', (socket) => {
-    console.log('A client connected:', socket.id);
-
-    socket.on('disconnect', () => {
-      console.log('Client disconnected:', socket.id);
+module.exports = {
+  /**
+   * Initializes Socket.IO with the given HTTP server.
+   * @param {http.Server} server - The HTTP server instance.
+   * @returns {SocketIO.Server} - The initialized Socket.IO server.
+   */
+  init: (server) => {
+    io = new Server(server, {
+      cors: {
+        origin: '*', // Adjust as needed for security in production
+        methods: ['GET', 'POST'],
+      },
     });
-  });
-
-  return ioInstance;
+    return io;
+  },
+  /**
+   * Retrieves the initialized Socket.IO server instance.
+   * @returns {SocketIO.Server} - The Socket.IO server instance.
+   */
+  getIO: () => {
+    if (!io) {
+      throw new Error('Socket.io not initialized!');
+    }
+    return io;
+  },
 };
-
-const getIO = () => {
-  if (!ioInstance) {
-    throw new Error('Socket.IO not initialized!');
-  }
-  return ioInstance;
-};
-
-module.exports = { initIO, getIO };
