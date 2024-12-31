@@ -7,7 +7,7 @@ on:
 
 env:
   AZURE_WEBAPP_NAME: simptipserver            # Your Azure WebApp name
-  AZURE_WEBAPP_PACKAGE_PATH: './server'      # Path to your server directory
+  AZURE_WEBAPP_PACKAGE_PATH: './server'       # Path to your server directory
   NODE_VERSION: '18.x'                        # Node.js version
 
 permissions:
@@ -32,8 +32,15 @@ jobs:
       - name: Install Dependencies
         working-directory: ./server
         run: npm install
-   
-      # Step 4: Deploy to Azure WebApp
+
+      # Step 4: Set Development Environment Variables
+      - name: Set Development Environment
+        working-directory: ./server
+        run: |
+          echo "NODE_ENV=development" > .env
+          echo "API_URL=https://dev.api.simptipserver.com" >> .env
+
+      # Step 5: Deploy to Azure WebApp
       - name: Deploy to Azure WebApp
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v2
