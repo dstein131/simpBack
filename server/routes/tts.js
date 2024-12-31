@@ -26,7 +26,7 @@ router.put('/:id/status', authenticateToken, updateTTSRequestStatus); // PUT rou
 router.get('/download/:id', authenticateToken, downloadTTSAudio); // GET route to download TTS audio
 
 // New route for fetching TTS requests by creator
-router.get('/creator/:creatorId', authenticateToken, getTTSRequestsByCreator); // GET route to fetch TTS requests by creator
+router.get('/creator', authenticateToken, getTTSRequestsByCreator);
 
 // Export the router
 module.exports = router;

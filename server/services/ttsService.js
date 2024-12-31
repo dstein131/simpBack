@@ -1,4 +1,4 @@
-// service/ttsService.js
+// services/ttsService.js
 
 const axios = require('axios');
 const db = require('../db');
@@ -50,6 +50,7 @@ const generateTTS = async (text, voice) => {
         timeout: 30000, // 30 seconds timeout
       }
     );
+    logger.debug(`TTS generation successful for voice: "${validVoice}"`);
     return response.data;
   } catch (error) {
     const errorMessage = error.response?.data?.detail?.message || error.message || 'Failed to generate TTS';
@@ -99,8 +100,6 @@ const updateTTSRequestInDB = async (ttsRequestId, status, audioUrl = null) => {
     throw new Error('Failed to update TTS request in the database.');
   }
 };
-
-
 
 /*********************************************
  * Process TTS Request
