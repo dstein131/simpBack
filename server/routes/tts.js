@@ -9,6 +9,7 @@ const {
   getAvailableVoices,
   downloadTTSAudio,
   getTTSRequestsByCreator, // Import the new controller
+  getTTSRequestStatus, // Import the new controller for polling
 } = require('../controllers/ttsController'); // Ensure correct path
 const { authenticateToken } = require('../middlewares/auth'); // Import the authentication middleware
 
@@ -25,8 +26,9 @@ router.get('/', authenticateToken, getTTSRequests); // GET route to fetch TTS re
 router.put('/:id/status', authenticateToken, updateTTSRequestStatus); // PUT route to update TTS request status
 router.get('/download/:id', authenticateToken, downloadTTSAudio); // GET route to download TTS audio
 
-// New route for fetching TTS requests by creator
-router.get('/creator', authenticateToken, getTTSRequestsByCreator);
+// New routes for fetching TTS requests by creator and polling status
+router.get('/creator', authenticateToken, getTTSRequestsByCreator); // GET route to fetch TTS requests by creator
+router.get('/request-status/:ttsRequestId', authenticateToken, getTTSRequestStatus); // GET route to poll TTS request status
 
 // Export the router
 module.exports = router;

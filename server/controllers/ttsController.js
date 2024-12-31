@@ -368,6 +368,35 @@ const getTTSRequestsByCreator = async (req, res) => {
   }
 };
 
+/**
+ * Get TTS Request Status
+ * GET /api/tts/request-status/:ttsRequestId
+ */
+const getTTSRequestStatus = async (req, res) => {
+  try {
+    const { ttsRequestId } = req.params;
+
+    logger.info(`Fetching status for TTS Request ID: ${ttsRequestId}`);
+
+    const [ttsRequests] = await db.query(
+      'SELECT status, audio_url AS audioUrl FROM tts_requests WHERE id = ?',
+      [ttsRequestId]
+    );
+
+    if (ttsRequests.length === 0) {
+      logger.warn(`TTS Request not found for ID: ${ttsRequestId}`);
+      return res.status(404).json({ error: 'TTS request not found.' });
+    }
+
+    const { status, audioUrl } = ttsRequests[0];
+
+    res.status(200).json({ status, audioUrl });
+  } catch (error) {
+    logger.error(`❌ Error in getTTSRequestStatus:`, error);
+    res.status(500).json({ error: 'Failed to fetch TTS request status.' });
+  }
+};
+
 // Export controller functions
 module.exports = {
   submitTTSRequest,
@@ -376,4 +405,5 @@ module.exports = {
   updateTTSRequestStatus,
   getTTSRequests,
   getTTSRequestsByCreator,
+  getTTSRequestStatus, // Export the new polling function
 };
