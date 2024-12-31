@@ -27,32 +27,21 @@ const submitTTSRequest = async (req, res) => {
 
     console.log('Received Request:', { message, voice, userId, creatorId });
 
-    if (!userId) {
-      return res.status(400).json({ error: 'User ID is required.' });
+    // Validate inputs
+    if (!userId || !message || !voice || !creatorId) {
+      return res.status(400).json({
+        error: 'All fields (userId, message, voice, creatorId) are required.',
+      });
     }
 
-    if (!message) {
-      return res.status(400).json({ error: 'Message is required.' });
-    }
-
-    if (!voice) {
-      return res.status(400).json({ error: 'Voice selection is required.' });
-    }
-
-    if (!creatorId) {
-      return res.status(400).json({ error: 'Creator ID is required.' });
-    }
-
-    // Validate the user ID exists in the database
+    // Validate the user ID exists
     const [userExists] = await db.query('SELECT id FROM users WHERE id = ?', [userId]);
-
     if (userExists.length === 0) {
       return res.status(400).json({ error: 'Invalid user ID.' });
     }
 
-    // Validate the creator ID exists in the database
+    // Validate the creator ID exists
     const [creatorExists] = await db.query('SELECT id FROM creators WHERE id = ?', [creatorId]);
-
     if (creatorExists.length === 0) {
       return res.status(400).json({ error: 'Invalid creator ID.' });
     }
@@ -64,12 +53,12 @@ const submitTTSRequest = async (req, res) => {
     );
 
     const ttsRequestId = result.insertId;
-    console.log('TTS Request Created with ID:', ttsRequestId);
+    console.log(`TTS Request Created with ID: ${ttsRequestId}`);
 
-    // Ensure the status is updated to 'processing' after insertion
+    // Update the status to 'processing' after insertion
     await db.query('UPDATE tts_requests SET status = "processing" WHERE id = ?', [ttsRequestId]);
 
-    // Emit socket event to notify the group
+    // Emit socket event to notify the creator's room of the new TTS request
     if (req.app.io) {
       req.app.io.to(`creator-room-${creatorId}`).emit('tts-request', {
         ttsRequestId,
@@ -79,6 +68,7 @@ const submitTTSRequest = async (req, res) => {
         creatorId,
         status: 'pending',
       });
+      console.log(`Socket event emitted to creator-room-${creatorId} for TTS Request ID ${ttsRequestId}`);
     }
 
     // Enqueue the TTS processing job
@@ -91,13 +81,11 @@ const submitTTSRequest = async (req, res) => {
       },
       {
         attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 5000,
-        },
+        backoff: { type: 'exponential', delay: 5000 },
       }
     );
 
+    // Respond with success
     res.status(201).json({
       message: 'TTS request submitted successfully!',
       ttsRequestId,
@@ -203,8 +191,10 @@ const getAvailableVoicesController = async (req, res) => {
  */
 const updateTTSRequestStatus = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { status, audioUrl } = req.body;
+    const { id } = req.params; // TTS Request ID
+    const { status, audioUrl } = req.body; // New status and optional audio URL
+
+    console.log(`Updating TTS Request ID ${id} with status ${status} and audio URL ${audioUrl}`);
 
     // Validate status
     const validStatuses = ['pending', 'processing', 'completed', 'failed'];
@@ -230,24 +220,30 @@ const updateTTSRequestStatus = async (req, res) => {
 
     console.log(`TTS Request ID ${id} status updated to ${status}`);
 
-    // Emit socket event to notify the group of status change
+    // Emit socket event to notify the creator's room about the status change
     if (req.app.io) {
       req.app.io.to(`creator-room-${ttsRequest.creator_id}`).emit('tts-request', {
         ttsRequestId: id,
         status,
         audioUrl,
-        ...ttsRequest,
+        message: ttsRequest.message,
+        voice: ttsRequest.voice,
+        creatorId: ttsRequest.creator_id,
+        userId: ttsRequest.user_id,
       });
+      console.log(`Socket event emitted to creator-room-${ttsRequest.creator_id} for TTS Request ID ${id}`);
     }
 
+    // Respond with a success message
     res.status(200).json({
-      message: `TTS request ${status} successfully.`,
+      message: `TTS request ${status} successfully updated.`,
     });
   } catch (error) {
     console.error('❌ Error in updateTTSRequestStatus:', error);
     res.status(500).json({ error: 'Failed to update TTS request status.' });
   }
 };
+
 
 
 /**
