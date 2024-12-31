@@ -121,7 +121,8 @@ const downloadTTSAudio = async (req, res) => {
 
     // Validate userId
     if (!userId) {
-      return res.status(400).json({ error: 'User ID is required.' });
+      res.status(400).json({ error: 'User ID is required.' });
+      return;
     }
 
     // Fetch TTS request details from the database
@@ -131,18 +132,21 @@ const downloadTTSAudio = async (req, res) => {
     );
 
     if (ttsRequests.length === 0) {
-      return res.status(404).json({ error: 'TTS request not found or not associated with this user.' });
+      res.status(404).json({ error: 'TTS request not found or not associated with this user.' });
+      return;
     }
 
     const { audio_url: audioUrl, status } = ttsRequests[0];
 
     // Ensure TTS processing is completed
     if (status !== 'completed') {
-      return res.status(400).json({ error: 'Audio file is still being processed.' });
+      res.status(400).json({ error: 'Audio file is still being processed.' });
+      return;
     }
 
     if (!audioUrl) {
-      return res.status(400).json({ error: 'Audio file URL not available.' });
+      res.status(400).json({ error: 'Audio file URL not available.' });
+      return;
     }
 
     // Parse the audioUrl to extract bucket and key
@@ -158,18 +162,23 @@ const downloadTTSAudio = async (req, res) => {
       Key: key,
     });
 
-    const response = await s3Client.send(command);
+    const s3Response = await s3Client.send(command);
 
-    // Set headers once and stream the S3 file to the client
+    // Ensure headers are set once before streaming the response
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Content-Disposition', `attachment; filename="audio-${id}.mp3"`);
 
-    response.Body.pipe(res).on('error', (err) => {
-      console.error('Error while streaming audio:', err);
-      if (!res.headersSent) {
-        res.status(500).json({ error: 'Failed to stream audio file.' });
-      }
-    });
+    // Pipe the response to the client
+    s3Response.Body.pipe(res)
+      .on('error', (err) => {
+        console.error('Error streaming audio file:', err);
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Error streaming audio file.' });
+        }
+      })
+      .on('finish', () => {
+        console.log(`Audio file for TTS request ID ${id} served successfully.`);
+      });
   } catch (error) {
     console.error('❌ Error in downloadTTSAudio:', error);
     if (!res.headersSent) {
