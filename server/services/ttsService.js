@@ -93,12 +93,13 @@ const updateTTSRequestInDB = async (ttsRequestId, status, audioUrl = null) => {
       'UPDATE tts_requests SET status = ?, processed_at = NOW(), audio_url = ? WHERE id = ?',
       [status, audioUrl, ttsRequestId]
     );
-    logger.info(`✅ TTS request ID ${ttsRequestId} updated successfully.`);
+    logger.info(`✅ TTS request ID ${ttsRequestId} updated successfully to status: ${status}`);
   } catch (error) {
     logger.error(`❌ Error updating TTS request ID: ${ttsRequestId} - ${error.message}`);
     throw new Error('Failed to update TTS request in the database.');
   }
 };
+
 
 
 /*********************************************
@@ -112,12 +113,13 @@ const processTTSRequest = async (ttsRequestId, message, voice, useS3 = true) => 
       ? await saveTTSAudioToS3(ttsRequestId, audioData)
       : `/tts_audios/${ttsRequestId}-${uuidv4()}.mp3`; // For local storage
 
+    logger.debug(`Updating status to 'completed' for TTS Request ID: ${ttsRequestId}`);
     await updateTTSRequestInDB(ttsRequestId, 'completed', audioUrl);
     logger.info(`✅ TTS request ID ${ttsRequestId} processed successfully with audio URL: ${audioUrl}`);
     return audioUrl;
   } catch (error) {
+    logger.error(`❌ Failed to process TTS request ID: ${ttsRequestId} - ${error.message}`);
     await updateTTSRequestInDB(ttsRequestId, 'failed');
-    logger.error(`❌ Failed to process TTS request ID: ${ttsRequestId}`);
     throw error;
   }
 };
