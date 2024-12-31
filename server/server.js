@@ -56,7 +56,10 @@ app.use('/tts_audios', express.static(path.join(__dirname, 'public', 'tts_audios
  *  SOCKET.IO
  ********************************************/
 const server = http.createServer(app);
-const io = socket.init(server);
+const io = socket.init(server); // Initialize Socket.IO and export
+
+// Attach Socket.IO to the app so it can be accessed in controllers
+app.io = io;
 
 // Handle Socket.IO connections
 io.on('connection', (socket) => {
@@ -143,7 +146,7 @@ ttsQueue.on('completed', async (job, result) => {
   try {
     // Fetch creator_id based on ttsRequestId
     const [rows] = await db.query(
-      'SELECT user_id FROM tts_requests WHERE id = ?',
+      'SELECT creator_id FROM tts_requests WHERE id = ?',
       [ttsRequestId]
     );
 
@@ -152,10 +155,10 @@ ttsQueue.on('completed', async (job, result) => {
       return;
     }
 
-    const creator_id = rows[0].user_id; // Assuming user_id identifies the creator
+    const creatorId = rows[0].creator_id;
 
     // Emit the 'tts-request' event to the specific creator's room
-    io.to(creator_id.toString()).emit('tts-request', {
+    io.to(`creator-room-${creatorId}`).emit('tts-request', {
       ttsRequestId,
       message,
       voice,
@@ -177,7 +180,7 @@ ttsQueue.on('failed', async (job, err) => {
   try {
     // Fetch creator_id based on ttsRequestId
     const [rows] = await db.query(
-      'SELECT user_id FROM tts_requests WHERE id = ?',
+      'SELECT creator_id FROM tts_requests WHERE id = ?',
       [ttsRequestId]
     );
 
@@ -186,10 +189,10 @@ ttsQueue.on('failed', async (job, err) => {
       return;
     }
 
-    const creator_id = rows[0].user_id; // Assuming user_id identifies the creator
+    const creatorId = rows[0].creator_id;
 
     // Emit the 'tts-request-failed' event to the specific creator's room
-    io.to(creator_id.toString()).emit('tts-request-failed', {
+    io.to(`creator-room-${creatorId}`).emit('tts-request-failed', {
       ttsRequestId,
       message,
       voice,
@@ -225,4 +228,3 @@ process.on('uncaughtException', (error) => {
   logger.error('Uncaught Exception:', error);
   process.exit(1); // Optional: Exit the process if necessary
 });
-

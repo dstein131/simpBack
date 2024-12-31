@@ -69,6 +69,18 @@ const submitTTSRequest = async (req, res) => {
     // Ensure the status is updated to 'processing' after insertion
     await db.query('UPDATE tts_requests SET status = "processing" WHERE id = ?', [ttsRequestId]);
 
+    // Emit socket event to notify the group
+    if (req.app.io) {
+      req.app.io.to(`creator-room-${creatorId}`).emit('tts-request', {
+        ttsRequestId,
+        message,
+        voice,
+        userId,
+        creatorId,
+        status: 'pending',
+      });
+    }
+
     // Enqueue the TTS processing job
     await ttsQueue.add(
       {
@@ -95,6 +107,7 @@ const submitTTSRequest = async (req, res) => {
     res.status(500).json({ error: 'Failed to submit TTS request.' });
   }
 };
+
 
 
 
@@ -164,9 +177,6 @@ const downloadTTSAudio = async (req, res) => {
 
 
 
-
-
-
 /**
  * Get Available Voices
  * GET /api/tts/voices
@@ -203,11 +213,13 @@ const updateTTSRequestStatus = async (req, res) => {
     }
 
     // Fetch the TTS request to check if it exists
-    const [ttsRequests] = await db.query('SELECT id FROM tts_requests WHERE id = ?', [id]);
+    const [ttsRequests] = await db.query('SELECT * FROM tts_requests WHERE id = ?', [id]);
 
     if (ttsRequests.length === 0) {
       return res.status(404).json({ error: 'TTS request not found.' });
     }
+
+    const ttsRequest = ttsRequests[0];
 
     // Prepare the update query
     const updateQuery = 'UPDATE tts_requests SET status = ?, audio_url = ? WHERE id = ?';
@@ -218,6 +230,16 @@ const updateTTSRequestStatus = async (req, res) => {
 
     console.log(`TTS Request ID ${id} status updated to ${status}`);
 
+    // Emit socket event to notify the group of status change
+    if (req.app.io) {
+      req.app.io.to(`creator-room-${ttsRequest.creator_id}`).emit('tts-request', {
+        ttsRequestId: id,
+        status,
+        audioUrl,
+        ...ttsRequest,
+      });
+    }
+
     res.status(200).json({
       message: `TTS request ${status} successfully.`,
     });
@@ -226,6 +248,7 @@ const updateTTSRequestStatus = async (req, res) => {
     res.status(500).json({ error: 'Failed to update TTS request status.' });
   }
 };
+
 
 /**
  * Get TTS Requests for Logged-in User
