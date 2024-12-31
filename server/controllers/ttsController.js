@@ -25,22 +25,22 @@ const submitTTSRequest = async (req, res) => {
   try {
     const { message, voice, userId, creatorId } = req.body;
 
-    console.log('Received Request:', { message, voice, userId, creatorId });
+    console.log('Received TTS Request:', { message, voice, userId, creatorId });
 
-    // Validate inputs
+    // Validate input fields
     if (!userId || !message || !voice || !creatorId) {
       return res.status(400).json({
         error: 'All fields (userId, message, voice, creatorId) are required.',
       });
     }
 
-    // Validate the user ID exists
+    // Check if the user exists
     const [userExists] = await db.query('SELECT id FROM users WHERE id = ?', [userId]);
     if (userExists.length === 0) {
       return res.status(400).json({ error: 'Invalid user ID.' });
     }
 
-    // Validate the creator ID exists
+    // Check if the creator exists
     const [creatorExists] = await db.query('SELECT id FROM creators WHERE id = ?', [creatorId]);
     if (creatorExists.length === 0) {
       return res.status(400).json({ error: 'Invalid creator ID.' });
@@ -55,23 +55,27 @@ const submitTTSRequest = async (req, res) => {
     const ttsRequestId = result.insertId;
     console.log(`TTS Request Created with ID: ${ttsRequestId}`);
 
-    // Update the status to 'processing' after insertion
+    // Update the status to 'processing' after creation
     await db.query('UPDATE tts_requests SET status = "processing" WHERE id = ?', [ttsRequestId]);
 
-    // Emit socket event to notify the creator's room of the new TTS request
+    // Emit a socket event to notify the creator's room about the new TTS request
     if (req.app.io) {
-      req.app.io.to(`creator-room-${creatorId}`).emit('tts-request', {
+      const eventData = {
         ttsRequestId,
         message,
         voice,
         userId,
         creatorId,
         status: 'processing',
-      });
-      console.log(`Socket event emitted to creator-room-${creatorId} for TTS Request ID ${ttsRequestId}`);
+      };
+
+      req.app.io.to(`creator-room-${creatorId}`).emit('tts-request', eventData);
+      console.log(`Socket event emitted to creator-room-${creatorId} for TTS Request ID ${ttsRequestId}:`, eventData);
+    } else {
+      console.error('Socket.IO instance is not available.');
     }
 
-    // Enqueue the TTS processing job
+    // Add the TTS processing job to the queue
     await ttsQueue.add(
       {
         ttsRequestId,
@@ -84,17 +88,22 @@ const submitTTSRequest = async (req, res) => {
         backoff: { type: 'exponential', delay: 5000 },
       }
     );
+    console.log(`TTS Request ID ${ttsRequestId} added to the processing queue.`);
 
-    // Respond with success
+    // Respond to the client with success
     res.status(201).json({
       message: 'TTS request submitted successfully!',
       ttsRequestId,
     });
   } catch (error) {
     console.error('❌ Error in submitTTSRequest:', error);
-    res.status(500).json({ error: 'Failed to submit TTS request.' });
+
+    // Provide a detailed error response in development mode
+    const errorMessage = process.env.NODE_ENV === 'development' ? error.message : 'Failed to submit TTS request.';
+    res.status(500).json({ error: errorMessage });
   }
 };
+
 
 
 
@@ -196,13 +205,13 @@ const updateTTSRequestStatus = async (req, res) => {
 
     console.log(`Updating TTS Request ID ${id} with status: ${status}, audioUrl: ${audioUrl}`);
 
-    // Validate status
+    // Validate the status value
     const validStatuses = ['pending', 'processing', 'completed', 'failed'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Invalid status provided.' });
     }
 
-    // Fetch the TTS request to check if it exists
+    // Check if the TTS request exists
     const [ttsRequests] = await db.query('SELECT * FROM tts_requests WHERE id = ?', [id]);
     if (ttsRequests.length === 0) {
       return res.status(404).json({ error: 'TTS request not found.' });
@@ -210,18 +219,16 @@ const updateTTSRequestStatus = async (req, res) => {
 
     const ttsRequest = ttsRequests[0];
 
-    // Prepare the update query
+    // Update the TTS request in the database
     const updateQuery = 'UPDATE tts_requests SET status = ?, audio_url = ? WHERE id = ?';
     const updateValues = [status, audioUrl || null, id];
 
-    // Update the TTS request in the database
     await db.query(updateQuery, updateValues);
-
     console.log(`TTS Request ID ${id} successfully updated to status: ${status}`);
 
-    // Emit socket event to notify the creator's room about the status change
+    // Emit a socket event to notify the creator's room of the status update
     if (req.app.io) {
-      req.app.io.to(`creator-room-${ttsRequest.creator_id}`).emit('tts-request', {
+      const eventData = {
         ttsRequestId: id,
         status,
         audioUrl: audioUrl || null,
@@ -229,20 +236,26 @@ const updateTTSRequestStatus = async (req, res) => {
         voice: ttsRequest.voice,
         creatorId: ttsRequest.creator_id,
         userId: ttsRequest.user_id,
-      });
-      console.log(`Socket event emitted to creator-room-${ttsRequest.creator_id} for TTS Request ID ${id}`);
+      };
+
+      req.app.io.to(`creator-room-${ttsRequest.creator_id}`).emit('tts-request', eventData);
+      console.log(`Socket event emitted to creator-room-${ttsRequest.creator_id} for TTS Request ID ${id}:`, eventData);
+    } else {
+      console.error('Socket.IO instance is not available.');
     }
 
-    // Respond with a success message
+    // Respond to the client with a success message
     res.status(200).json({
       message: `TTS request status updated successfully to: ${status}`,
     });
   } catch (error) {
     console.error('❌ Error in updateTTSRequestStatus:', error);
-    res.status(500).json({ error: 'Failed to update TTS request status.' });
+
+    // Provide a detailed error response in development mode
+    const errorMessage = process.env.NODE_ENV === 'development' ? error.message : 'Failed to update TTS request status.';
+    res.status(500).json({ error: errorMessage });
   }
 };
-
 
 
 
