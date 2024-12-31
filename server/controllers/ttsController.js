@@ -55,10 +55,10 @@ const submitTTSRequest = async (req, res) => {
     const ttsRequestId = result.insertId;
     console.log(`TTS Request Created with ID: ${ttsRequestId}`);
 
-    // Update the status to 'processing' after creation
+    // Update the status to 'processing'
     await db.query('UPDATE tts_requests SET status = "processing" WHERE id = ?', [ttsRequestId]);
 
-    // Emit a socket event to notify the creator's room about the new TTS request
+    // Emit a socket event
     if (req.app.io) {
       const eventData = {
         ttsRequestId,
@@ -68,42 +68,28 @@ const submitTTSRequest = async (req, res) => {
         creatorId,
         status: 'processing',
       };
-
       req.app.io.to(`creator-room-${creatorId}`).emit('tts-request', eventData);
       console.log(`Socket event emitted to creator-room-${creatorId} for TTS Request ID ${ttsRequestId}:`, eventData);
-    } else {
-      console.error('Socket.IO instance is not available.');
     }
 
     // Add the TTS processing job to the queue
     await ttsQueue.add(
-      {
-        ttsRequestId,
-        message,
-        voice,
-        useS3: true,
-      },
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 5000 },
-      }
+      { ttsRequestId, message, voice, useS3: true },
+      { attempts: 3, backoff: { type: 'exponential', delay: 5000 } }
     );
     console.log(`TTS Request ID ${ttsRequestId} added to the processing queue.`);
 
-    // Respond to the client with success
+    // Send response
     if (!res.headersSent) {
-      res.status(201).json({
+      return res.status(201).json({
         message: 'TTS request submitted successfully!',
         ttsRequestId,
       });
     }
   } catch (error) {
     console.error('❌ Error in submitTTSRequest:', error);
-
-    // Provide a detailed error response in development mode
     if (!res.headersSent) {
-      const errorMessage = process.env.NODE_ENV === 'development' ? error.message : 'Failed to submit TTS request.';
-      res.status(500).json({ error: errorMessage });
+      return res.status(500).json({ error: 'Failed to submit TTS request.' });
     }
   }
 };
@@ -114,17 +100,16 @@ const submitTTSRequest = async (req, res) => {
  */
 const downloadTTSAudio = async (req, res) => {
   try {
-    const { id } = req.params; // TTS request ID
-    const userId = req.query.userId; // User ID from query parameters
+    const { id } = req.params;
+    const userId = req.query.userId;
 
     console.log(`Requesting download for TTS request ID: ${id}, User ID: ${userId}`);
 
-    // Validate userId
     if (!userId) {
       return res.status(400).json({ error: 'User ID is required.' });
     }
 
-    // Fetch TTS request details from the database
+    // Fetch TTS request details
     const [ttsRequests] = await db.query(
       'SELECT audio_url, status FROM tts_requests WHERE id = ? AND user_id = ?',
       [id, userId]
@@ -136,7 +121,6 @@ const downloadTTSAudio = async (req, res) => {
 
     const { audio_url: audioUrl, status } = ttsRequests[0];
 
-    // Ensure TTS processing is completed
     if (status !== 'completed') {
       return res.status(400).json({ error: 'Audio file is still being processed.' });
     }
@@ -145,22 +129,16 @@ const downloadTTSAudio = async (req, res) => {
       return res.status(400).json({ error: 'Audio file URL not available.' });
     }
 
-    // Parse the audioUrl to extract bucket and key
+    // Fetch and stream the audio
     const s3Url = new URL(audioUrl);
-    const bucketName = s3Url.host.split('.')[0]; // Extract bucket name from URL host
-    const key = decodeURIComponent(s3Url.pathname.slice(1)); // Remove leading slash and decode
+    const bucketName = s3Url.host.split('.')[0];
+    const key = decodeURIComponent(s3Url.pathname.slice(1));
 
     console.log(`Fetching audio file from S3 bucket: ${bucketName}, key: ${key}`);
 
-    // Prepare the S3 command to fetch the object
-    const command = new GetObjectCommand({
-      Bucket: bucketName,
-      Key: key,
-    });
-
+    const command = new GetObjectCommand({ Bucket: bucketName, Key: key });
     const s3Response = await s3Client.send(command);
 
-    // Stream the audio file to the client
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Content-Disposition', `attachment; filename="audio-${id}.mp3"`);
 
@@ -176,12 +154,12 @@ const downloadTTSAudio = async (req, res) => {
       });
   } catch (error) {
     console.error('❌ Error in downloadTTSAudio:', error);
-
     if (!res.headersSent) {
-      res.status(500).json({ error: 'Failed to download TTS audio.' });
+      return res.status(500).json({ error: 'Failed to download TTS audio.' });
     }
   }
 };
+
 
 
 
