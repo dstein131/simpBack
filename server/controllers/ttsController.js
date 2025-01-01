@@ -176,6 +176,7 @@ const downloadTTSAudio = async (req, res) => {
 const getAvailableVoicesController = async (req, res) => {
   try {
     const voices = [
+      { id: 'sDSBbBr0YrSbCDpcIuFZ', name: 'Joey C' },
       { id: '1RcwTpiWrRYrRDK2Tkeu', name: 'Sam Hyde' },
       { id: 's2wvuS7SwITYg8dqsJdn', name: 'Old Italian Man' },
       { id: '3DxWrjC62YRLoXiYBGB0', name: 'Evil Orc' },
