@@ -21,14 +21,14 @@ router.get('/voices', getAvailableVoices); // GET route to fetch available voice
 // router.get('/voices', authenticateToken, getAvailableVoices);
 
 // Protected Routes
-router.post('/', authenticateToken, submitTTSRequest); // POST route to submit TTS request
-router.get('/', authenticateToken, getTTSRequests); // GET route to fetch TTS requests for logged-in user
-router.put('/:id/status', authenticateToken, updateTTSRequestStatus); // PUT route to update TTS request status
-router.get('/download/:id', authenticateToken, downloadTTSAudio); // GET route to download TTS audio
+router.post('/', submitTTSRequest); // POST route to submit TTS request
+router.get('/', getTTSRequests); // GET route to fetch TTS requests for logged-in user
+router.put('/:id/status', updateTTSRequestStatus); // PUT route to update TTS request status
+router.get('/download/:id', downloadTTSAudio); // GET route to download TTS audio
 
 // New routes for fetching TTS requests by creator and polling status
-router.get('/creator', authenticateToken, getTTSRequestsByCreator); // GET route to fetch TTS requests by creator
-router.get('/request-status/:ttsRequestId', authenticateToken, getTTSRequestStatus); // GET route to poll TTS request status
+router.get('/creator', getTTSRequestsByCreator); // GET route to fetch TTS requests by creator
+router.get('/request-status/:ttsRequestId', getTTSRequestStatus); // GET route to poll TTS request status
 
 // Export the router
 module.exports = router;
